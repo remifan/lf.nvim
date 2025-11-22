@@ -59,6 +59,21 @@ end
 
 -- Try to find LSP JAR in common locations
 local function find_lsp_jar()
+  -- First, check environment variable LF_LSP_JAR
+  local env_jar = vim.env.LF_LSP_JAR
+  if env_jar and vim.fn.filereadable(env_jar) == 1 then
+    return env_jar
+  end
+
+  -- If env var is set but invalid, expand it (might contain wildcards)
+  if env_jar then
+    local expanded = vim.fn.glob(vim.fn.expand(env_jar), false, true)
+    if #expanded > 0 and vim.fn.filereadable(expanded[1]) == 1 then
+      return expanded[1]
+    end
+  end
+
+  -- Fall back to common paths
   local common_paths = {
     -- User's home build
     vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-SNAPSHOT-all.jar"),

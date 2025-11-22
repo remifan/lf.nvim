@@ -74,8 +74,11 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
 
       -- LSP configuration
       lsp = {
-        -- Auto-detected if nil, or specify path:
-        jar_path = vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar"),
+        -- Auto-detected if nil. Priority order:
+        -- 1. Environment variable: LF_LSP_JAR
+        -- 2. Explicit jar_path config below
+        -- 3. Common locations (~/lingua-franca/lsp/build/libs/, etc.)
+        jar_path = nil,  -- or vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar")
         java_cmd = "java",
         java_args = { "-Xmx2G" },
         auto_start = true,
@@ -118,9 +121,33 @@ cd lingua-franca
 # JAR location: lsp/build/libs/lsp-VERSION-SNAPSHOT-all.jar
 ```
 
-### Auto-Detection
+### Configuration Methods
 
-The plugin automatically searches common locations:
+The plugin finds the LSP JAR in this priority order:
+
+**1. Environment Variable (Recommended)**
+
+Set `LF_LSP_JAR` in your shell profile:
+
+```bash
+# In ~/.bashrc, ~/.zshrc, or shell config
+export LF_LSP_JAR="$HOME/lingua-franca/lsp/build/libs/lsp-0.8.1-SNAPSHOT-all.jar"
+
+# Or with wildcard (auto-expands to latest)
+export LF_LSP_JAR="$HOME/lingua-franca/lsp/build/libs/lsp-*-all.jar"
+```
+
+**2. Explicit Configuration**
+
+```lua
+lsp = {
+  jar_path = vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar"),
+}
+```
+
+**3. Auto-Detection**
+
+If neither above is set, searches common locations:
 - `~/lingua-franca/lsp/build/libs/lsp-*-all.jar`
 - `./lsp/build/libs/lsp-*-all.jar` (current directory)
 - `../lingua-franca/lsp/build/libs/lsp-*-all.jar` (parent directory)
