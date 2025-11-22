@@ -1,0 +1,249 @@
+/* Lingua Franca Diagram Viewer Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#header {
+  background: #252526;
+  border-bottom: 1px solid #3e3e42;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+#header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #cccccc;
+  margin: 0;
+}
+
+#status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+#status-indicator {
+  font-size: 10px;
+}
+
+.status-connected {
+  color: #4ec9b0;
+}
+
+.status-disconnected {
+  color: #f48771;
+}
+
+.status-loading {
+  color: #dcdcaa;
+}
+
+#controls {
+  display: flex;
+  gap: 8px;
+}
+
+#controls button {
+  background: #3e3e42;
+  border: 1px solid #555555;
+  color: #cccccc;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+#controls button:hover {
+  background: #505050;
+  border-color: #6c6c6c;
+}
+
+#controls button:active {
+  background: #2a2a2a;
+}
+
+#main-container {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+
+#diagram-container {
+  flex: 1;
+  background: #1e1e1e;
+  position: relative;
+  overflow: hidden;
+}
+
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #888;
+}
+
+.spinner {
+  border: 3px solid #333;
+  border-top: 3px solid #4ec9b0;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#info-panel {
+  width: 300px;
+  background: #252526;
+  border-left: 1px solid #3e3e42;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+#info-panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #cccccc;
+}
+
+#element-info {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#element-info .hint {
+  color: #888;
+  font-style: italic;
+}
+
+#element-info dl {
+  margin-top: 12px;
+}
+
+#element-info dt {
+  font-weight: 600;
+  color: #4ec9b0;
+  margin-top: 8px;
+}
+
+#element-info dd {
+  margin-left: 12px;
+  color: #d4d4d4;
+}
+
+/* Sprotty diagram styling */
+.sprotty {
+  width: 100%;
+  height: 100%;
+}
+
+.sprotty-graph {
+  width: 100%;
+  height: 100%;
+}
+
+/* LF-specific diagram elements */
+.lf-reactor {
+  fill: #264f78;
+  stroke: #4ec9b0;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lf-reactor:hover {
+  fill: #2d5a8f;
+  stroke: #5fd9b5;
+  stroke-width: 3;
+}
+
+.lf-reactor.selected {
+  fill: #3d6fa8;
+  stroke: #7fe9c5;
+  stroke-width: 3;
+}
+
+.lf-reactor.highlighted {
+  fill: #4d7fb8;
+  stroke: #8ff9d5;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 8px #4ec9b0);
+}
+
+.lf-connection {
+  stroke: #858585;
+  stroke-width: 2;
+  fill: none;
+}
+
+.lf-connection:hover {
+  stroke: #b0b0b0;
+  stroke-width: 3;
+}
+
+.lf-port {
+  fill: #dcdcaa;
+  stroke: #cccccc;
+  stroke-width: 1;
+}
+
+.lf-port:hover {
+  fill: #e6e6b4;
+  stroke: #ffffff;
+}
+
+.lf-label {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12px;
+  fill: #d4d4d4;
+  user-select: none;
+}
+
+/* Error state */
+.error-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #5a1d1d;
+  border: 1px solid #f48771;
+  padding: 20px;
+  border-radius: 4px;
+  max-width: 500px;
+  text-align: center;
+}
+
+.error-message h3 {
+  color: #f48771;
+  margin-bottom: 12px;
+}
+
+.error-message p {
+  color: #d4d4d4;
+  font-size: 13px;
+  line-height: 1.6;
+}

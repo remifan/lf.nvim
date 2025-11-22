@@ -1,0 +1,21 @@
+{
+  "name": "lf-diagram-server",
+  "version": "0.1.0",
+  "description": "Node sidecar for LF diagram viewing in Neovim",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc && node dist/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/node": "^20.9.0",
+    "@types/ws": "^8.5.8",
+    "typescript": "^5.2.2"
+  }
+}

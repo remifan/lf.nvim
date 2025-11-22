@@ -1,0 +1,24 @@
+# Claude Code development files (internal use only)
+.claude/
+
+# Build artifacts
+diagram-server/node_modules/
+diagram-server/dist/
+diagram-server/*.log
+html/dist/
+html/node_modules/
+html/*.log
+
+# Neovim
+*.swp
+*.swo
+*~
+.DS_Store
+
+# LSP server (not included in plugin)
+*.jar
+
+# Test files
+test.lf
+minimal-init.lua
+example-config.lua

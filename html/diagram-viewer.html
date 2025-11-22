@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lingua Franca Diagram Viewer</title>
+  <link rel="stylesheet" href="css/diagram.css">
+  <!-- Sprotty for diagram rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/sprotty@0.13.0/lib/pack.min.js"></script>
+</head>
+<body>
+  <div id="header">
+    <h1>Lingua Franca Diagram Viewer</h1>
+    <div id="status">
+      <span id="status-indicator" class="status-disconnected">●</span>
+      <span id="status-text">Initializing...</span>
+    </div>
+    <div id="controls">
+      <button id="btn-zoom-in" title="Zoom In">+</button>
+      <button id="btn-zoom-out" title="Zoom Out">-</button>
+      <button id="btn-fit" title="Fit to View">⊡</button>
+      <button id="btn-refresh" title="Refresh Diagram">↻</button>
+    </div>
+  </div>
+
+  <div id="main-container">
+    <div id="diagram-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading diagram...</p>
+      </div>
+    </div>
+
+    <div id="info-panel">
+      <h3>Element Info</h3>
+      <div id="element-info">
+        <p class="hint">Click on diagram elements to see details and navigate to code.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/lf-diagram-client.js"></script>
+  <script>
+    // Parse URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileUri = urlParams.get('file');
+
+    // Initialize the diagram client
+    const client = new LFDiagramClient({
+      container: 'diagram-container',
+      fileUri: fileUri,
+      lspServerUrl: 'ws://localhost:5007', // LSP WebSocket (we'll need to discover this)
+      neovimRpcUrl: 'http://localhost:8765/api'
+    });
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      client.init();
+    });
+
+    // Button handlers
+    document.getElementById('btn-zoom-in')?.addEventListener('click', () => client.zoomIn());
+    document.getElementById('btn-zoom-out')?.addEventListener('click', () => client.zoomOut());
+    document.getElementById('btn-fit')?.addEventListener('click', () => client.fitToView());
+    document.getElementById('btn-refresh')?.addEventListener('click', () => client.refresh());
+  </script>
+</body>
+</html>

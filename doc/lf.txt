@@ -1,0 +1,230 @@
+*lf.txt*  Lingua Franca plugin for Neovim
+
+==============================================================================
+CONTENTS                                                        *lf-contents*
+
+1. Introduction ...................... |lf-introduction|
+2. Installation ...................... |lf-installation|
+3. Configuration ..................... |lf-configuration|
+4. Commands .......................... |lf-commands|
+5. Functions ......................... |lf-functions|
+6. Features .......................... |lf-features|
+7. Troubleshooting ................... |lf-troubleshooting|
+8. Contributing ...................... |lf-contributing|
+
+==============================================================================
+1. INTRODUCTION                                             *lf-introduction*
+
+lf.nvim is a full-featured Neovim plugin for Lingua Franca, providing LSP
+integration, build management, and advanced IDE features.
+
+The plugin reuses the official Lingua Franca Language Server (Java-based)
+to provide feature parity with the VSCode extension.
+
+Features:
+  - Full LSP support (diagnostics, hover, completion, etc.)
+  - Custom build system integration
+  - Reactor library browser
+  - AST viewer
+  - Diagram support (via lfd tool)
+
+==============================================================================
+2. INSTALLATION                                             *lf-installation*
+
+Requirements:~
+  - Neovim >= 0.10.0
+  - Java 17 or higher
+  - Lingua Franca LSP server (built from the LF repository)
+
+Building the LSP Server:~
+>
+  cd /path/to/lingua-franca
+  ./gradlew :lsp:shadowJar
+<
+
+The JAR will be at: `lsp/build/libs/lsp-<version>-all.jar`
+
+Using lazy.nvim:~
+>
+  {
+    dir = "/path/to/lingua-franca/nvim-plugin",
+    ft = "lf",
+    opts = {
+      lsp = {
+        jar_path = "/path/to/lsp-all.jar",
+      },
+    },
+  }
+<
+
+Manual Installation:~
+>
+  mkdir -p ~/.local/share/nvim/site/pack/plugins/start/
+  ln -s /path/to/lingua-franca/nvim-plugin \
+    ~/.local/share/nvim/site/pack/plugins/start/lf.nvim
+<
+
+==============================================================================
+3. CONFIGURATION                                           *lf-configuration*
+
+Default configuration:~
+>
+  require("lf").setup({
+    lsp = {
+      jar_path = nil,              -- Required
+      java_cmd = "java",
+      java_args = {"-Xmx2G"},
+      auto_start = true,
+      on_attach = nil,
+      capabilities = nil,
+      settings = {},
+    },
+    build = {
+      auto_validate = true,
+      show_progress = true,
+      open_quickfix = true,
+    },
+    ui = {
+      use_telescope = true,
+      progress_style = "notify",   -- "notify" or "echo"
+    },
+    keymaps = {
+      build = "<leader>lb",
+      run = "<leader>lr",
+      show_ast = "<leader>la",
+      library = "<leader>ll",
+      diagram = "<leader>ld",
+    },
+  })
+<
+
+==============================================================================
+4. COMMANDS                                                     *lf-commands*
+
+Build Commands:~
+
+:LFBuild [args]                                                     *:LFBuild*
+  Build the current LF file with optional arguments.
+
+:LFRun [args]                                                         *:LFRun*
+  Build and run the current LF file.
+
+:LFCancel                                                           *:LFCancel*
+  Cancel the current build operation.
+
+:LFValidate                                                       *:LFValidate*
+  Validate the current file without compilation (quick check).
+
+AST Commands:~
+
+:LFShowAST                                                         *:LFShowAST*
+  Display the abstract syntax tree in a split window.
+
+:LFExportAST [file]                                             *:LFExportAST*
+  Export the AST to a file (default: current file with .sexp extension).
+
+Library Commands:~
+
+:LFLibrary                                                         *:LFLibrary*
+  Browse available reactor libraries using telescope or vim.ui.select.
+
+Diagram Commands:~
+
+:LFDiagram                                                         *:LFDiagram*
+  Generate and view diagram using external viewer (requires lfd).
+
+:LFDiagramInfo                                                 *:LFDiagramInfo*
+  Show information about diagram support.
+
+:LFExportDiagram [file] [format]                           *:LFExportDiagram*
+  Export diagram to file (formats: svg, png, pdf).
+
+LSP Commands:~
+
+:LFStart                                                             *:LFStart*
+  Manually start the LF Language Server.
+
+:LFStop                                                               *:LFStop*
+  Stop the LF Language Server.
+
+:LFRestart                                                         *:LFRestart*
+  Restart the LF Language Server.
+
+:LFInfo                                                               *:LFInfo*
+  Show LSP server information and status.
+
+:LFTargetPosition                                           *:LFTargetPosition*
+  Jump to the target declaration in the current file.
+
+==============================================================================
+5. FUNCTIONS                                                   *lf-functions*
+
+lf.setup({config})                                                 *lf.setup()*
+  Setup the lf.nvim plugin with the given configuration.
+
+  Parameters:~
+    {config}  (table) Configuration table (see |lf-configuration|)
+
+lf.get_config()                                             *lf.get_config()*
+  Get the current plugin configuration.
+
+  Returns:~
+    (table) Current configuration
+
+==============================================================================
+6. FEATURES                                                     *lf-features*
+
+LSP Features:~
+  - Syntax highlighting (via TreeSitter or fallback syntax file)
+  - Diagnostics (errors, warnings, info)
+  - Go to definition (gd)
+  - Go to references (gr)
+  - Hover documentation (K)
+  - Code completion (<C-x><C-o>)
+  - Document symbols
+  - Rename refactoring (<leader>rn)
+
+Custom Features:~
+  - Build system integration with progress reporting
+  - Reactor library browser with telescope integration
+  - AST viewer with S-expression format
+  - Diagram generation (via lfd tool)
+  - Auto-validation on save
+  - Quickfix integration for build errors
+
+==============================================================================
+7. TROUBLESHOOTING                                       *lf-troubleshooting*
+
+LSP Server Not Starting:~
+  1. Verify Java installation: `java -version` (requires Java 17+)
+  2. Check JAR path in configuration
+  3. Manually test: `java -jar /path/to/lsp-all.jar`
+  4. Check logs: `:LspLog` or `:messages`
+
+Build Failures:~
+  1. Ensure you're in a valid LF project
+  2. Check quickfix list: `:copen`
+  3. Verify target configuration in .lf file
+  4. Check LSP server logs
+
+Performance Issues:~
+  1. Increase JVM heap: `java_args = {"-Xmx4G"}`
+  2. Disable auto-validation: `build.auto_validate = false`
+  3. Use partial builds instead of full builds
+
+==============================================================================
+8. CONTRIBUTING                                             *lf-contributing*
+
+This plugin is part of the Lingua Franca project.
+
+Repository: https://github.com/lf-lang/lingua-franca
+Issues: https://github.com/lf-lang/lingua-franca/issues
+
+To contribute:
+  1. Fork the repository
+  2. Create a feature branch
+  3. Make your changes
+  4. Submit a pull request
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

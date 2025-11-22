@@ -1,0 +1,324 @@
+# lf.nvim
+
+Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with syntax highlighting, LSP support, and interactive diagram viewing.
+
+## ✨ Features
+
+### 🎨 Syntax Highlighting (Always Available)
+- **Complete syntax highlighting** for Lingua Franca files
+- **Embedded language support** - Proper highlighting for C/C++, Python, TypeScript, and Rust code blocks
+- **Automatic target detection** - Detects target language from `target` declarations
+- **Smart keyword management** - Built-in updater syncs with official VSCode extension
+- **Time unit highlighting** - Special highlighting for `nsec`, `msec`, `sec`, etc.
+- **Code folding** - Fold reactor and preamble blocks
+- **Cross-platform** - Works on Mac, Linux, and Windows
+
+### 🚀 LSP Features (Mac/Linux Only)
+> **Note**: LSP features require Mac or Linux as Lingua Franca doesn't support Windows
+
+- **Full LSP Support** - Diagnostics, completion, hover, go-to-definition, references
+- **Build Integration** - Build and run LF programs from Neovim with progress reporting
+- **Interactive Diagrams** - View and interact with KLighD reactor diagrams in browser
+- **Jump to Source** - Click diagram elements to jump to code locations
+- **Library Browser** - Browse and import reactor libraries with Telescope
+- **AST Viewer** - Inspect abstract syntax tree
+- **Real-time Validation** - Auto-validate on save with quickfix integration
+
+## 📦 Installation
+
+### Minimal (Syntax Only)
+
+For users who only want syntax highlighting:
+
+```lua
+-- lazy.nvim
+{
+  "remifan/lf.nvim",
+  ft = "lf",
+  config = function()
+    require("lf").setup({
+      enable_lsp = false,  -- Disable LSP features
+      syntax = {
+        auto_detect_target = true,
+        indent = { size = 4, use_tabs = false },
+      },
+    })
+  end,
+}
+```
+
+### Full Setup (Syntax + LSP + Diagrams)
+
+For the complete experience with LSP, diagrams, and all features (Mac/Linux):
+
+```lua
+-- lazy.nvim
+{
+  "remifan/lf.nvim",
+  ft = "lf",
+  dependencies = {
+    "nvim-telescope/telescope.nvim",  -- Optional: enhanced library browser
+  },
+  build = "cd diagram-server && npm install",  -- For diagram viewing
+  config = function()
+    require("lf").setup({
+      enable_lsp = true,
+
+      -- Syntax highlighting
+      syntax = {
+        auto_detect_target = true,
+        target_language = nil,  -- or "C", "Cpp", "Python", "Rust", "TypeScript"
+        indent = { size = 4, use_tabs = false },
+      },
+
+      -- LSP configuration
+      lsp = {
+        -- Auto-detected if nil, or specify path:
+        jar_path = vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar"),
+        java_cmd = "java",
+        java_args = { "-Xmx2G" },
+        auto_start = true,
+      },
+
+      -- Build settings
+      build = {
+        auto_validate = true,
+        show_progress = true,
+        open_quickfix = true,
+      },
+
+      -- Keymaps
+      keymaps = {
+        build = "<leader>lb",
+        run = "<leader>lr",
+        diagram = "<leader>ld",
+        library = "<leader>ll",
+        show_ast = "<leader>la",
+      },
+    })
+  end,
+}
+```
+
+## 🛠️ LSP Setup (Optional)
+
+LSP features require the Lingua Franca LSP server JAR.
+
+### Build from Source
+
+```bash
+# Clone Lingua Franca repository
+git clone https://github.com/lf-lang/lingua-franca.git
+cd lingua-franca
+
+# Build LSP server
+./gradlew buildLsp
+
+# JAR location: lsp/build/libs/lsp-VERSION-SNAPSHOT-all.jar
+```
+
+### Auto-Detection
+
+The plugin automatically searches common locations:
+- `~/lingua-franca/lsp/build/libs/lsp-*-all.jar`
+- `./lsp/build/libs/lsp-*-all.jar` (current directory)
+- `../lingua-franca/lsp/build/libs/lsp-*-all.jar` (parent directory)
+
+### Verify Installation
+
+```vim
+:checkhealth lf
+```
+
+## 🚀 Usage
+
+### Syntax Highlighting Commands
+
+Available in all modes (no LSP required):
+
+| Command | Description |
+|---------|-------------|
+| `:LFInfo` | Show plugin configuration and detected target language |
+| `:LFDetectTarget` | Manually detect target language from current buffer |
+| `:LFUpdateSyntax` | Update syntax from VSCode extension (requires internet) |
+| `:LFUpdateSyntaxDryRun` | Preview available syntax updates |
+| `:LFShowKeywords` | Display all LF keywords from VSCode grammar |
+
+### LSP Commands
+
+Only available when LSP is enabled (Mac/Linux):
+
+| Command | Description |
+|---------|-------------|
+| `:LFBuild` | Build current LF program |
+| `:LFRun` | Build and run current LF program |
+| `:LFDiagram` | Open interactive KLighD diagram in browser |
+| `:LFLibrary` | Browse reactor library (uses Telescope if available) |
+| `:LFShowAST` | Show abstract syntax tree |
+| `:LFLspInfo` | Show LSP server status |
+| `:LFLspRestart` | Restart LSP server |
+
+### Default Keybindings (LSP Mode)
+
+When in a `.lf` buffer with LSP enabled:
+
+- `<leader>lb` - Build current file
+- `<leader>lr` - Build and run
+- `<leader>ld` - View interactive diagram
+- `<leader>ll` - Browse reactor library
+- `<leader>la` - Show AST
+
+Standard LSP keybindings:
+- `gd` - Go to definition
+- `gr` - Show references
+- `K` - Hover documentation
+
+### Interactive Diagrams
+
+The diagram viewer provides an interactive browser-based view of your reactors:
+
+1. Open a `.lf` file
+2. Run `:LFDiagram`
+3. Browser opens with interactive diagram
+4. **Click elements** to jump to source code in Neovim
+5. Zoom, pan, and explore reactor structure
+
+**Architecture**: Uses Node.js sidecar to bridge browser ↔ Neovim communication.
+
+## 🎨 Syntax Highlighting Details
+
+### Lingua Franca Keywords
+- **Core**: `reactor`, `input`, `output`, `action`, `state`, `timer`, `reaction`, `method`, `preamble`
+- **Modifiers**: `public`, `private`, `widthof`, `mutable`
+- **Control flow**: `if`, `else`, `for`, `while`
+- **Temporal**: `startup`, `shutdown`, `after`, `physical`, `logical`
+
+### Literals & Operators
+- **Time units**: `nsec`, `msec`, `sec`, `min`, `hour`, `day`, `week`
+- **Numbers**: Integers, floats, scientific notation
+- **Strings**: Single, double, and triple-quoted with escape sequences
+- **Operators**: `->`, `~>`, `::`, arithmetic and logical operators
+- **Booleans**: `true`, `false`, `True`, `False`
+
+### Embedded Languages
+
+Code within `{= =}` delimiters gets full syntax highlighting:
+- **C/C++**: Functions, keywords, types, preprocessor directives
+- **Python**: Keywords, builtins, decorators, string formatting
+- **TypeScript**: Types, interfaces, async/await, JSX
+- **Rust**: Ownership keywords, macros, lifetimes
+
+### Comments
+- Line comments: `//` and `#`
+- Block comments: `/* */`
+- TODO/FIXME highlighting
+
+## 🔄 Keeping Syntax Updated
+
+Sync with the official VSCode extension:
+
+```vim
+:LFUpdateSyntax
+```
+
+Or from command line:
+
+```bash
+nvim -l scripts/update_syntax.lua
+```
+
+See [UPDATING.md](UPDATING.md) for details.
+
+## 📖 Documentation
+
+Comprehensive help documentation:
+
+```vim
+:help lf
+```
+
+Topics include:
+- Installation and configuration
+- Syntax highlighting groups
+- LSP features and commands
+- Diagram interaction
+- Target language detection
+- Troubleshooting
+
+## 🤝 Contributing
+
+Contributions welcome! This plugin combines:
+- Syntax grammar from [VSCode Lingua Franca extension](https://github.com/lf-lang/vscode-lingua-franca)
+- LSP server from [Lingua Franca compiler](https://github.com/lf-lang/lingua-franca)
+
+### Reporting Issues
+
+If you encounter:
+- Missing keyword highlighting
+- Incorrect syntax highlighting
+- LSP connection issues
+- Diagram rendering problems
+
+Please open an issue with:
+1. Example `.lf` file demonstrating the problem
+2. Expected vs actual behavior
+3. Neovim version (`:version`)
+4. Platform (Mac/Linux/Windows)
+5. For LSP issues: output of `:checkhealth lf` and `:LspLog`
+
+### Development
+
+```bash
+# Clone the repository
+git clone https://github.com/remifan/lf.nvim.git
+cd lf.nvim
+
+# Test locally (syntax only)
+nvim -u NONE -c "set rtp+=." test.lf
+
+# Install diagram dependencies (for LSP features)
+cd diagram-server && npm install
+```
+
+## 🔧 Troubleshooting
+
+### Syntax Highlighting Not Working
+
+1. Verify filetype is detected: `:set ft?` should show `filetype=lf`
+2. Force syntax reload: `:syntax sync fromstart`
+3. Check for conflicting plugins
+
+### LSP Server Not Starting
+
+1. Verify Java is installed: `java -version` (requires Java 17+)
+2. Check JAR path: `:checkhealth lf`
+3. Manually test server: `java -jar /path/to/lsp-*-all.jar`
+4. Check Neovim LSP logs: `:LspLog`
+
+### Diagrams Not Opening
+
+1. Ensure Node.js is installed: `node --version`
+2. Install dependencies: `cd diagram-server && npm install`
+3. Check sidecar logs in `:messages`
+
+### Performance Issues
+
+1. Increase JVM heap: `java_args = {"-Xmx4G"}`
+2. Disable auto-validation: `build.auto_validate = false`
+
+## 📖 Resources
+
+- **Lingua Franca**: https://www.lf-lang.org/
+- **LF Documentation**: https://www.lf-lang.org/docs/
+- **LF Compiler**: https://github.com/lf-lang/lingua-franca
+- **VSCode Extension**: https://github.com/lf-lang/vscode-lingua-franca
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Syntax grammar based on the official [VSCode Lingua Franca extension](https://github.com/lf-lang/vscode-lingua-franca)
+- LSP server from the [Lingua Franca compiler project](https://github.com/lf-lang/lingua-franca)
+- Built for the [Lingua Franca](https://www.lf-lang.org/) community
