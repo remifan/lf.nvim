@@ -79,6 +79,14 @@ function M.setup()
     desc = "Open interactive KLighD diagram viewer with jump-to-source",
   })
 
+  -- Alias for convenience
+  vim.api.nvim_create_user_command("LFDiagram", function()
+    local diagram_klighd = require("lf.diagram_klighd")
+    diagram_klighd.open()
+  end, {
+    desc = "Open interactive KLighD diagram viewer (alias for LFDiagramOpen)",
+  })
+
   vim.api.nvim_create_user_command("LFDiagramClose", function()
     local diagram_klighd = require("lf.diagram_klighd")
     diagram_klighd.stop()
