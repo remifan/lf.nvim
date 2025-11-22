@@ -97,6 +97,13 @@ function M.setup()
     desc = "Toggle KLighD diagram viewer",
   })
 
+  vim.api.nvim_create_user_command("LFDiagramBuild", function()
+    local diagram_klighd = require("lf.diagram_klighd")
+    diagram_klighd.build_dependencies()
+  end, {
+    desc = "Build diagram dependencies (diagram-server and frontend)",
+  })
+
   -- Static diagram export commands
   vim.api.nvim_create_user_command("LFDiagramExport", function()
     local diagram = require("lf.diagram")

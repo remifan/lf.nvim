@@ -59,7 +59,8 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
   dependencies = {
     "nvim-telescope/telescope.nvim",  -- Optional: enhanced library browser
   },
-  build = "cd diagram-server && npm install",  -- For diagram viewing
+  -- Note: Diagram dependencies build automatically on first use
+  -- No need to specify build command!
   config = function()
     require("lf").setup({
       enable_lsp = true,
@@ -152,7 +153,9 @@ Only available when LSP is enabled (Mac/Linux):
 |---------|-------------|
 | `:LFBuild` | Build current LF program |
 | `:LFRun` | Build and run current LF program |
-| `:LFDiagram` | Open interactive KLighD diagram in browser |
+| `:LFDiagramOpen` | Open interactive KLighD diagram in browser (auto-builds on first use) |
+| `:LFDiagramBuild` | Manually build diagram dependencies (if auto-build fails) |
+| `:LFDiagramClose` | Close diagram viewer |
 | `:LFLibrary` | Browse reactor library (uses Telescope if available) |
 | `:LFShowAST` | Show abstract syntax tree |
 | `:LFLspInfo` | Show LSP server status |
@@ -178,10 +181,15 @@ Standard LSP keybindings:
 The diagram viewer provides an interactive browser-based view of your reactors:
 
 1. Open a `.lf` file
-2. Run `:LFDiagram`
-3. Browser opens with interactive diagram
-4. **Click elements** to jump to source code in Neovim
-5. Zoom, pan, and explore reactor structure
+2. Run `:LFDiagramOpen`
+3. **First time only**: Dependencies build automatically (may take a few minutes)
+4. Browser opens with interactive diagram
+5. **Click elements** to jump to source code in Neovim
+6. Zoom, pan, and explore reactor structure
+
+**Requirements**: Node.js must be installed for diagram features.
+
+**Troubleshooting**: If auto-build fails, run `:LFDiagramBuild` manually to retry.
 
 **Architecture**: Uses Node.js sidecar to bridge browser ↔ Neovim communication.
 

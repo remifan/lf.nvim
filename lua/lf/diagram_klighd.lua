@@ -4,6 +4,105 @@
 
 local M = {}
 
+-- Get the plugin path
+local function get_plugin_path()
+  return vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h")
+end
+
+-- Get cache file path for tracking build status
+local function get_build_cache_file()
+  local cache_dir = vim.fn.stdpath("cache") .. "/lf.nvim"
+  vim.fn.mkdir(cache_dir, "p")
+  return cache_dir .. "/diagram-built"
+end
+
+-- Check if dependencies are already built
+local function is_built()
+  local plugin_path = get_plugin_path()
+  local sidecar_dist = plugin_path .. "/diagram-server/dist/server.js"
+  local frontend_dist = plugin_path .. "/html/dist"
+
+  return vim.fn.filereadable(sidecar_dist) == 1 and vim.fn.isdirectory(frontend_dist) == 1
+end
+
+-- Build diagram dependencies
+function M.build_dependencies()
+  local plugin_path = get_plugin_path()
+
+  vim.notify("Building diagram dependencies (first time setup)...\nThis may take a few minutes.", vim.log.levels.INFO)
+
+  -- Build diagram-server
+  local sidecar_dir = plugin_path .. "/diagram-server"
+  vim.notify("Building diagram server...", vim.log.levels.INFO)
+
+  local server_build_cmd = string.format(
+    "cd %s && npm install && npm run build",
+    vim.fn.shellescape(sidecar_dir)
+  )
+
+  local server_result = vim.fn.system(server_build_cmd)
+  if vim.v.shell_error ~= 0 then
+    vim.notify(
+      "Failed to build diagram server:\n" .. server_result ..
+      "\n\nPlease run manually:\ncd " .. sidecar_dir .. " && npm install && npm run build",
+      vim.log.levels.ERROR
+    )
+    return false
+  end
+
+  -- Build html frontend
+  local html_dir = plugin_path .. "/html"
+  vim.notify("Building diagram frontend...", vim.log.levels.INFO)
+
+  local html_build_cmd = string.format(
+    "cd %s && npm install && npm run build",
+    vim.fn.shellescape(html_dir)
+  )
+
+  local html_result = vim.fn.system(html_build_cmd)
+  if vim.v.shell_error ~= 0 then
+    vim.notify(
+      "Failed to build diagram frontend:\n" .. html_result ..
+      "\n\nPlease run manually:\ncd " .. html_dir .. " && npm install && npm run build",
+      vim.log.levels.ERROR
+    )
+    return false
+  end
+
+  -- Mark as built in cache
+  local cache_file = get_build_cache_file()
+  local f = io.open(cache_file, "w")
+  if f then
+    f:write(os.time())
+    f:close()
+  end
+
+  vim.notify("Diagram dependencies built successfully!", vim.log.levels.INFO)
+  return true
+end
+
+-- Ensure dependencies are built (auto-build on first use)
+local function ensure_dependencies_built()
+  -- Check if already built
+  if is_built() then
+    return true
+  end
+
+  -- Check if we've already tried building this session (avoid infinite loops)
+  local cache_file = get_build_cache_file()
+  if vim.fn.filereadable(cache_file) == 1 then
+    -- Cache exists but build is not complete - previous build failed
+    vim.notify(
+      "Diagram dependencies are not built.\nPrevious build may have failed.\nUse :LFDiagramBuild to try again.",
+      vim.log.levels.WARN
+    )
+    return false
+  end
+
+  -- Auto-build
+  return M.build_dependencies()
+end
+
 -- Check if required dependencies are available
 function M.check_dependencies()
   local errors = {}
@@ -15,7 +114,7 @@ function M.check_dependencies()
   end
 
   -- Check if sidecar is built
-  local plugin_path = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h")
+  local plugin_path = get_plugin_path()
   local sidecar_dir = plugin_path .. "/diagram-server"
   local sidecar_dist = sidecar_dir .. "/dist/server.js"
   if vim.fn.filereadable(sidecar_dist) == 0 then
@@ -59,7 +158,12 @@ function M.open()
     return
   end
 
-  -- Check dependencies
+  -- Ensure dependencies are built (auto-build on first use)
+  if not ensure_dependencies_built() then
+    return
+  end
+
+  -- Check other dependencies (Node.js, LSP)
   local ok, errors = M.check_dependencies()
   if not ok then
     vim.notify(
