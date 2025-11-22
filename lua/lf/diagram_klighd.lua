@@ -265,33 +265,53 @@ end
 ---@return table|nil symbol_path Array of symbol names from root to target
 local function parse_element_id(element_id)
   -- Element IDs have different formats:
-  -- - Reactor instance: "$root$Nmain_main$Nmain_w" → ["main", "w"]
-  -- - Reaction inside: "$root$Nmain_main$Nmain_w$Nmain_w_reaction_1" → ["main", "w", "reaction_1"]
-  -- - Port inside: "$root$Nmain_main$Nmain_w$Nmain_w_in" → ["main", "w", "in"]
+  -- - Reactor instance: "$root$Nmain_main$Nmain_h" → ["h"] (just the instance name)
+  -- - Reaction inside: "$root$Nmain_main$Nmain_w$Nmain_w_reaction_1" → ["w", "reaction_1"]
+  -- - Port inside: "$root$Nmain_main$Nmain_w$Nmain_w_in" → ["w", "in"]
 
   local parts = vim.split(element_id, "$N")
   if #parts == 0 then
     return nil
   end
 
-  local symbol_path = {}
+  -- Get the last part which contains the instance/element name
+  local last_part = parts[#parts]
+  local segments = vim.split(last_part, "_")
 
-  for i, part in ipairs(parts) do
-    if i > 1 then  -- Skip "$root"
-      -- Each part is like "main_main" or "main_w_reaction_1"
-      -- Try to extract the last component (instance/element name)
-      local segments = vim.split(part, "_")
-      if #segments > 0 then
-        table.insert(symbol_path, segments[#segments])
-      end
-    end
+  if #segments == 0 then
+    return nil
   end
 
-  return #symbol_path > 0 and symbol_path or nil
+  -- For reactor instances at top level (e.g., "$root$Nmain_main$Nmain_w"):
+  -- - parts = ["$root", "main_main", "main_w"]
+  -- - If we have exactly 3 parts, it's a top-level instance
+  -- - Just return the instance name
+
+  if #parts == 3 then
+    -- Top-level reactor instance - just return the instance name
+    local instance_name = segments[#segments]
+    return { instance_name }
+  end
+
+  -- For nested elements (reactions, ports inside instances):
+  -- - parts has 4+ elements
+  -- - e.g., "$root$Nmain_main$Nmain_w$Nmain_w_reaction_1"
+  if #parts >= 4 then
+    local prev_part = parts[#parts - 1]
+    local prev_segments = vim.split(prev_part, "_")
+    local parent_instance = prev_segments[#prev_segments]
+    local instance_name = segments[#segments]
+
+    return { parent_instance, instance_name }
+  end
+
+  -- Fallback
+  local instance_name = segments[#segments]
+  return { instance_name }
 end
 
 -- Jump to symbol using LSP document symbols
----@param symbol_path table Array of symbol names (e.g., {"main", "w", "reaction_1"})
+---@param symbol_path table Array of symbol names (e.g., {"w"} or {"w", "reaction_1"})
 ---@param callback function|nil Optional callback after jump completes
 local function jump_to_symbol_lsp(symbol_path, callback)
   -- Get the LF LSP client
@@ -320,12 +340,14 @@ local function jump_to_symbol_lsp(symbol_path, callback)
     end
 
     -- Navigate through the symbol path
-    -- For ["main", "w", "reaction_1"], find "main", then find "w" in its children, then "reaction_1"
+    -- For ["w"], find "w" at top level
+    -- For ["w", "reaction_1"], find "w" then find "reaction_1" in its children
     local current_symbols = result
     local target_symbol = nil
 
     for i, name in ipairs(symbol_path) do
       local found = nil
+
       for _, symbol in ipairs(current_symbols) do
         -- Match by name or partial name (e.g., "reaction" might match "reaction(in)")
         if symbol.name == name or symbol.name:match("^" .. vim.pesc(name)) then
