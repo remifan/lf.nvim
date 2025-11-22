@@ -402,19 +402,33 @@ local function get_type_definition_location(client, instance_symbol, callback)
 
     if location then
       -- Handle LocationLink vs Location
+      local target_uri = nil
+      local target_range = nil
+
       if location.targetUri then
         -- LocationLink
-        callback({
-          uri = location.targetUri,
-          range = location.targetRange or location.targetSelectionRange
-        })
+        target_uri = location.targetUri
+        target_range = location.targetRange or location.targetSelectionRange
       else
         -- Location
-        callback({
-          uri = location.uri,
-          range = location.range
-        })
+        target_uri = location.uri
+        target_range = location.range
       end
+
+      -- Check if the definition is in the current file
+      -- External/imported reactors will have definitions in different files
+      -- Following VSCode behavior: ignore external reactor definitions
+      local current_uri = vim.uri_from_bufnr(0)
+      if target_uri ~= current_uri then
+        -- External reactor - do nothing (VSCode behavior)
+        callback(nil)
+        return
+      end
+
+      callback({
+        uri = target_uri,
+        range = target_range
+      })
     else
       callback(nil)
     end
@@ -487,9 +501,8 @@ local function jump_to_symbol_lsp(symbol_path, callback)
             local target_char = location.range.start.character
             vim.api.nvim_win_set_cursor(0, { target_line, target_char })
             vim.cmd('normal! zz')
-          else
-            vim.notify("Could not resolve type definition for " .. symbol_path[1], vim.log.levels.WARN)
           end
+          -- If location is nil, it's likely an external reactor - do nothing (VSCode behavior)
         end)
         return
       end
@@ -513,14 +526,16 @@ local function jump_to_symbol_lsp(symbol_path, callback)
         end
 
         if not reactor_type then
-          vim.notify("Could not find reactor type: " .. current_reactor_name, vim.log.levels.WARN)
+          -- Reactor type not found in current file - likely an external/imported reactor
+          -- VSCode behavior: do nothing, so we silently return
           return
         end
 
         -- Find the instance within this reactor's children
         local instance_symbol = find_instance_in_reactor(reactor_type, target_instance_name)
         if not instance_symbol then
-          vim.notify("Could not find instance " .. target_instance_name .. " in reactor " .. current_reactor_name, vim.log.levels.WARN)
+          -- Instance not found - likely part of external reactor
+          -- VSCode behavior: do nothing, so we silently return
           return
         end
 
@@ -532,9 +547,8 @@ local function jump_to_symbol_lsp(symbol_path, callback)
               local target_char = location.range.start.character
               vim.api.nvim_win_set_cursor(0, { target_line, target_char })
               vim.cmd('normal! zz')
-            else
-              vim.notify("Could not resolve type definition for " .. target_instance_name, vim.log.levels.WARN)
             end
+            -- If location is nil, it's likely an external reactor - do nothing (VSCode behavior)
           end)
         else
           -- Not the final target - extract the type name and continue navigating
@@ -547,9 +561,8 @@ local function jump_to_symbol_lsp(symbol_path, callback)
             local type_name = line_text:match("new%s+(%w+)")
             if type_name then
               navigate_nested_path(path_index + 1, type_name)
-            else
-              vim.notify("Could not extract type name from line: " .. line_text, vim.log.levels.WARN)
             end
+            -- If can't extract type name, silently fail (VSCode behavior)
           end
         end
       end
