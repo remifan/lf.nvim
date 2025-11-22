@@ -264,116 +264,91 @@ end
 ---@param element_id string
 ---@return table|nil symbol_path Array of symbol names from root to target
 local function parse_element_id(element_id)
-  -- Element IDs have different formats:
-  -- - Reactor instance: "$root$Nmain_main$Nmain_h" → ["h"] (just the instance name)
-  -- - Reaction inside: "$root$Nmain_main$Nmain_w$Nmain_w_reaction_1" → ["w", "reaction_1"]
-  -- - Port inside: "$root$Nmain_main$Nmain_w$Nmain_w_in" → ["w", "in"]
+  -- Element IDs encode the full path from root to target element
+  -- Format: "$root$N{parent}_{parent}$N{parent}_{inst1}$N{parent}_{inst1}_{inst2}$N..."
+  -- Examples:
+  --   "$root$Nmain_main$Nmain_h" → ["h"]
+  --   "$root$Nmain_main$Nmain_pipeline1$Nmain_pipeline1_pipeline" → ["pipeline1", "pipeline"]
+  --   "$root$Nmain_main$Nmain_pipeline1$Nmain_pipeline1_pipeline$Nmain_pipeline1_pipeline_filter" → ["pipeline1", "pipeline", "filter"]
 
   local parts = vim.split(element_id, "$N")
-  if #parts == 0 then
+
+  if #parts < 3 then
     return nil
   end
 
-  -- Get the last part which contains the instance/element name
-  local last_part = parts[#parts]
+  -- Skip first 2 parts: "$root" and parent reactor (e.g., "main_main")
+  -- Start from part 3 onwards to extract instance path
+  local symbol_path = {}
 
-  -- For top-level instances, the format is: {parent}_{instance}
-  -- where parent is usually "main" (from "main reactor")
-  -- The instance name is everything AFTER the first underscore + parent name
-  -- Examples:
-  --   "main_h" → parent="main", instance="h"
-  --   "main_final_sink" → parent="main", instance="final_sink"
-  --   "main_w$$P0" → parent="main", instance="w" (port stripped)
+  -- Each part after index 2 contains the cumulative path
+  -- e.g., "main_h", "main_pipeline1", "main_pipeline1_pipeline", etc.
+  -- We need to extract just the NEW instance name added at each level
 
-  if #parts == 3 then
-    -- Top-level reactor instance
-    -- Get the parent name from the second-to-last part
-    local parent_part = parts[#parts - 1]
-    local parent_segments = vim.split(parent_part, "_")
-    local parent_name = parent_segments[#parent_segments]  -- e.g., "main"
+  local prev_cumulative = ""
+  for i = 3, #parts do
+    local current_part = parts[i]
 
-    -- The instance name is everything after "parent_"
-    local pattern = "^" .. vim.pesc(parent_name) .. "_(.+)$"
-    local instance_name = last_part:match(pattern)
+    -- Strip port suffix if present (e.g., "h$$P0" → "h")
+    current_part = current_part:match("^(.+)%$%$") or current_part
 
-    if not instance_name then
-      -- Fallback: just take everything after first underscore
-      instance_name = last_part:match("^[^_]+_(.+)$") or last_part
-    end
+    local new_instance = nil
 
-    -- Check if this is a port or other sub-element (has $$)
-    local base_name = instance_name:match("^(.+)%$%$")
-    if base_name then
-      -- It's a port or sub-element, return just the instance name
-      return { base_name }
-    end
+    if i == 3 then
+      -- First instance (top-level): strip parent prefix
+      -- Format: "main_h" → "h"
+      local parent_part = parts[2]
+      local parent_segments = vim.split(parent_part, "_")
+      local parent_name = parent_segments[#parent_segments]
 
-    return { instance_name }
-  end
-
-  -- For nested elements (reactions, ports inside instances):
-  -- - parts has 4+ elements
-  -- - e.g., "$root$Nmain_main$Nmain_pipeline1$Nmain_pipeline1_monitor"
-  -- Need to extract: parent="pipeline1", child="monitor"
-  if #parts >= 4 then
-    -- Get the parent instance from the second-to-last part
-    local prev_part = parts[#parts - 1]
-
-    -- Extract parent instance name (same logic as top-level)
-    local prev_parent_part = parts[#parts - 2]
-    local prev_parent_segments = vim.split(prev_parent_part, "_")
-    local prev_parent_name = prev_parent_segments[#prev_parent_segments]
-
-    local parent_pattern = "^" .. vim.pesc(prev_parent_name) .. "_(.+)$"
-    local parent_instance = prev_part:match(parent_pattern)
-    if not parent_instance then
-      parent_instance = prev_part:match("^[^_]+_(.+)$") or prev_part
-    end
-
-    -- Now extract the child instance from last part
-    -- Last part format: "main_pipeline1_pipeline" or "parent_instance_child"
-    -- We need to strip both the grandparent prefix AND parent prefix
-    -- Example: "main_pipeline1_pipeline" → "pipeline"
-
-    -- First try: match "parent_instance_child" pattern
-    local child_pattern = "^" .. vim.pesc(parent_instance) .. "_(.+)$"
-    local child_instance = last_part:match(child_pattern)
-
-    if not child_instance then
-      -- Second try: strip grandparent, then extract after parent
-      -- Format: "grandparent_parent_child"
-      local without_grandparent = last_part:match("^[^_]+_(.+)$")
-      if without_grandparent then
-        -- Now we have "parent_child", extract child
-        local child_pattern2 = "^" .. vim.pesc(parent_instance) .. "_(.+)$"
-        child_instance = without_grandparent:match(child_pattern2)
-
-        if not child_instance then
-          -- Last resort: just take the last segment
-          local all_segments = vim.split(last_part, "_")
-          child_instance = all_segments[#all_segments]
-        end
-      else
-        child_instance = last_part
+      local pattern = "^" .. vim.pesc(parent_name) .. "_(.+)$"
+      new_instance = current_part:match(pattern)
+      if not new_instance then
+        new_instance = current_part:match("^[^_]+_(.+)$") or current_part
       end
+
+      prev_cumulative = current_part
+    else
+      -- Nested instance: strip the previous cumulative path
+      -- Format: "main_pipeline1_pipeline" with prev="main_pipeline1" → "pipeline"
+      local pattern = "^" .. vim.pesc(prev_cumulative) .. "_(.+)$"
+      new_instance = current_part:match(pattern)
+
+      if not new_instance then
+        -- Fallback: just take the last segment after splitting by underscore
+        local segments = vim.split(current_part, "_")
+        new_instance = segments[#segments]
+      end
+
+      prev_cumulative = current_part
     end
 
-    -- Check for port suffix
-    local base_child = child_instance:match("^(.+)%$%$")
-    if base_child then
-      child_instance = base_child
+    if new_instance then
+      table.insert(symbol_path, new_instance)
     end
-
-    return { parent_instance, child_instance }
   end
 
-  -- Fallback - shouldn't reach here
-  local fallback_name = last_part:match("^[^_]+_(.+)$") or last_part
-  return { fallback_name }
+  return symbol_path
+end
+
+-- Helper function to find an instance child within a reactor's children
+local function find_instance_in_reactor(reactor_symbol, instance_name)
+  if not reactor_symbol.children then
+    return nil
+  end
+
+  for _, child in ipairs(reactor_symbol.children) do
+    local child_base_name = child.name:match("%.(.+)$") or child.name
+    if child_base_name == instance_name then
+      return child
+    end
+  end
+
+  return nil
 end
 
 -- Jump to symbol using LSP document symbols
----@param symbol_path table Array of symbol names (e.g., {"w"} or {"w", "reaction_1"})
+---@param symbol_path table Array of symbol names (e.g., {"pipeline1"} or {"pipeline1", "pipeline", "filter"})
 ---@param callback function|nil Optional callback after jump completes
 local function jump_to_symbol_lsp(symbol_path, callback)
   -- Get the LF LSP client
@@ -401,163 +376,142 @@ local function jump_to_symbol_lsp(symbol_path, callback)
       return
     end
 
-    -- Navigate through the symbol path
-    -- For ["w"], find "w" at top level
-    -- For ["w", "reaction_1"], find "w" then find "reaction_1" in its children
-    local current_symbols = result
-    local target_symbol = nil
+    vim.schedule(function()
+      -- Strategy for any-level nesting:
+      -- 1. Start with top-level instance (always found at top level in LSP symbols)
+      -- 2. For each subsequent level, find the REACTOR TYPE of the previous instance
+      -- 3. Search that reactor type's children for the next instance
+      -- 4. Repeat until we reach the final target
+      -- 5. Jump to the final target's type definition
 
-    for i, name in ipairs(symbol_path) do
-      local found = nil
+      if #symbol_path == 0 then
+        vim.notify("Empty symbol path", vim.log.levels.WARN)
+        return
+      end
 
-      for _, symbol in ipairs(current_symbols) do
-        -- Match by name or partial name (e.g., "reaction" might match "reaction(in)")
-        if symbol.name == name or symbol.name:match("^" .. vim.pesc(name)) then
-          found = symbol
+      -- Step 1: Find the first instance at top level
+      local first_instance_name = symbol_path[1]
+      local first_instance = nil
+
+      for _, symbol in ipairs(result) do
+        if symbol.name == first_instance_name or symbol.name:match("^" .. vim.pesc(first_instance_name)) then
+          first_instance = symbol
           break
         end
       end
 
-      if not found then
-        -- For nested instances, the child isn't in the parent instance's children
-        -- (because LSP shows source structure, not runtime hierarchy).
-        -- Instead, search in ALL top-level symbols for the child name.
-        -- This will find it inside the reactor type definition.
-        if i == 2 and #symbol_path == 2 then
-          vim.schedule(function()
-            -- Search all top-level symbols and their children for the child name
-            -- When found, jump to the PARENT reactor definition (matching VSCode behavior)
-            local parent_reactor = nil
-            for _, top_symbol in ipairs(result) do
-              if top_symbol.name == name or top_symbol.name:match("^" .. vim.pesc(name)) then
-                parent_reactor = top_symbol
-                break
-              end
-              -- Also search in children (inside reactor definitions)
-              if top_symbol.children then
-                for _, child in ipairs(top_symbol.children) do
-                  -- Child names might be prefixed with reactor name: "MonitoredPipeline.pipeline"
-                  -- Match either exact name or name after the dot
-                  local child_base_name = child.name:match("%.(.+)$") or child.name
-                  if child.name == name or child_base_name == name or
-                     child.name:match("^" .. vim.pesc(name)) or
-                     child_base_name:match("^" .. vim.pesc(name)) then
-                    -- Jump to the parent reactor definition, not the child
-                    parent_reactor = top_symbol
-                    break
-                  end
-                end
-                if parent_reactor then break end
-              end
+      if not first_instance then
+        vim.notify("Could not find top-level instance: " .. first_instance_name, vim.log.levels.WARN)
+        return
+      end
+
+      -- If this is the only element in the path, jump to its type definition
+      if #symbol_path == 1 then
+        local range = first_instance.location and first_instance.location.range or first_instance.range
+        if range and range.start then
+          local line = range.start.line + 1
+          vim.api.nvim_win_set_cursor(0, { line, range.start.character })
+
+          local line_text = vim.fn.getline(line)
+          local type_start = line_text:find("new%s+")
+          if type_start then
+            local type_name_start = line_text:match("^%s*()", type_start + 4)
+            if type_name_start then
+              vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
+              vim.defer_fn(function()
+                vim.lsp.buf.definition()
+              end, 100)
             end
+          end
+        end
+        return
+      end
 
-            if parent_reactor then
-              -- Now find the actual child instance within the parent reactor
-              local child_instance = nil
-              if parent_reactor.children then
-                for _, child in ipairs(parent_reactor.children) do
-                  local child_base_name = child.name:match("%.(.+)$") or child.name
-                  if child_base_name == name then
-                    child_instance = child
-                    break
-                  end
-                end
-              end
-
-              if child_instance then
-                -- Jump to the child instance and trigger go-to-definition
-                local range = child_instance.location and child_instance.location.range or child_instance.range
-                if range and range.start then
-                  local line = range.start.line + 1
-                  local col = range.start.character
-
-                  vim.api.nvim_win_set_cursor(0, { line, col })
-
-                  -- Get the line text to find the type name
-                  local line_text = vim.fn.getline(line)
-                  local type_start = line_text:find("new%s+")
-                  if type_start then
-                    local type_col = type_start + 3
-                    local type_name_start = line_text:match("^%s*()", type_col + 1)
-                    if type_name_start then
-                      vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
-
-                      vim.defer_fn(function()
-                        vim.lsp.buf.definition()
-                      end, 100)
-                    end
-                  end
-                end
-              else
-                local range = parent_reactor.location and parent_reactor.location.range or parent_reactor.range
-                if range and range.start then
-                  local line = range.start.line + 1
-                  local col = range.start.character
-                  vim.api.nvim_win_set_cursor(0, { line, col })
-                  vim.cmd('normal! zz')
-                end
-              end
-            else
-              vim.notify("Could not find symbol: " .. name .. " (path: " .. table.concat(symbol_path, " > ") .. ")", vim.log.levels.WARN)
-            end
-          end)
-          return
-        else
-          vim.schedule(function()
-            vim.notify("Could not find symbol: " .. name .. " (path: " .. table.concat(symbol_path, " > ") .. ")", vim.log.levels.WARN)
-          end)
+      -- For nested paths, navigate through each level
+      -- We need to find reactor types and search their children
+      local function navigate_nested_path(path_index, current_reactor_name)
+        if path_index > #symbol_path then
           return
         end
-      end
 
-      if i == #symbol_path then
-        -- This is the target
-        target_symbol = found
-      else
-        -- Continue searching in children
-        current_symbols = found.children or {}
-      end
-    end
+        local target_instance_name = symbol_path[path_index]
 
-    if not target_symbol then
-      vim.schedule(function()
-        vim.notify("Could not resolve symbol path: " .. table.concat(symbol_path, " > "), vim.log.levels.WARN)
-      end)
-      return
-    end
-
-    -- Jump to the target symbol's TYPE definition (matching VSCode behavior)
-    -- Instead of jumping to "sensor1 = new Sensor()", jump to "reactor Sensor {"
-    vim.schedule(function()
-      local range = target_symbol.location and target_symbol.location.range or target_symbol.range
-      if range and range.start then
-        local line = range.start.line + 1
-        local col = range.start.character
-
-        -- First, jump to the symbol location (instance declaration)
-        vim.api.nvim_win_set_cursor(0, { line, col })
-
-        -- Get the line text to find the type name
-        local line_text = vim.fn.getline(line)
-        -- Look for "= new TypeName(" pattern
-        local type_start = line_text:find("new%s+")
-        if type_start then
-          -- Position cursor on the type name (after "new ")
-          local type_col = type_start + 3  -- Skip "new"
-          -- Find the first non-whitespace character after "new "
-          local type_name_start = line_text:match("^%s*()", type_col + 1)
-          if type_name_start then
-            vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
-
-            -- Now trigger go-to-definition
-            vim.defer_fn(function()
-              vim.lsp.buf.definition()
-            end, 100)  -- Small delay to ensure cursor position is updated
+        -- Find the reactor type definition
+        local reactor_type = nil
+        for _, symbol in ipairs(result) do
+          if symbol.name == current_reactor_name then
+            reactor_type = symbol
+            break
           end
         end
 
-        if callback then callback() end
+        if not reactor_type then
+          vim.notify("Could not find reactor type: " .. current_reactor_name, vim.log.levels.WARN)
+          return
+        end
+
+        -- Find the instance within this reactor's children
+        local instance_symbol = find_instance_in_reactor(reactor_type, target_instance_name)
+        if not instance_symbol then
+          vim.notify("Could not find instance " .. target_instance_name .. " in reactor " .. current_reactor_name, vim.log.levels.WARN)
+          return
+        end
+
+        -- If this is the final target, jump to its type definition
+        if path_index == #symbol_path then
+          local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
+          if range and range.start then
+            local line = range.start.line + 1
+            vim.api.nvim_win_set_cursor(0, { line, range.start.character })
+
+            local line_text = vim.fn.getline(line)
+            local type_start = line_text:find("new%s+")
+            if type_start then
+              local type_name_start = line_text:match("^%s*()", type_start + 4)
+              if type_name_start then
+                vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
+                vim.defer_fn(function()
+                  vim.lsp.buf.definition()
+                end, 100)
+              end
+            end
+          end
+        else
+          -- Not the final target - extract the type name and continue navigating
+          local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
+          if range and range.start then
+            local line = range.start.line + 1
+            local line_text = vim.fn.getline(line)
+
+            -- Extract type name from "instance = new TypeName()" pattern
+            local type_name = line_text:match("new%s+(%w+)")
+            if type_name then
+              navigate_nested_path(path_index + 1, type_name)
+            else
+              vim.notify("Could not extract type name from line: " .. line_text, vim.log.levels.WARN)
+            end
+          end
+        end
       end
+
+      -- Start navigation from the first instance
+      -- First, get its type name
+      local range = first_instance.location and first_instance.location.range or first_instance.range
+      if not range or not range.start then
+        vim.notify("Could not get location for first instance", vim.log.levels.WARN)
+        return
+      end
+
+      local line = range.start.line + 1
+      local line_text = vim.fn.getline(line)
+      local first_type_name = line_text:match("new%s+(%w+)")
+
+      if not first_type_name then
+        vim.notify("Could not extract type name from first instance", vim.log.levels.WARN)
+        return
+      end
+
+      navigate_nested_path(2, first_type_name)
     end)
   end, 0)
 end
