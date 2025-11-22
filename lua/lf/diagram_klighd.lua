@@ -347,6 +347,80 @@ local function find_instance_in_reactor(reactor_symbol, instance_name)
   return nil
 end
 
+-- Helper function to get type definition location without moving cursor
+-- Extracts the type name from an instance declaration and resolves its definition
+local function get_type_definition_location(client, instance_symbol, callback)
+  local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
+  if not range or not range.start then
+    callback(nil)
+    return
+  end
+
+  local line = range.start.line + 1
+  local line_text = vim.fn.getline(line)
+
+  -- Extract type name from "instance = new TypeName()" pattern
+  local type_name = line_text:match("new%s+(%w+)")
+  if not type_name then
+    callback(nil)
+    return
+  end
+
+  -- Find the position of the type name in the line
+  local type_start_pos = line_text:find("new%s+" .. vim.pesc(type_name))
+  if not type_start_pos then
+    callback(nil)
+    return
+  end
+
+  -- Calculate the character position of the type name (after "new ")
+  local type_char_pos = type_start_pos + 3  -- skip "new"
+  type_char_pos = line_text:match("^%s*()", type_char_pos + 1) - 1  -- find first non-whitespace
+
+  -- Make LSP definition request at the type name position
+  local params = {
+    textDocument = vim.lsp.util.make_text_document_params(),
+    position = {
+      line = range.start.line,  -- LSP uses 0-indexed lines
+      character = type_char_pos
+    }
+  }
+
+  client.request('textDocument/definition', params, function(err, result)
+    if err or not result then
+      callback(nil)
+      return
+    end
+
+    -- result can be Location | Location[] | LocationLink[]
+    local location = nil
+    if vim.islist(result) then
+      location = result[1]
+    else
+      location = result
+    end
+
+    if location then
+      -- Handle LocationLink vs Location
+      if location.targetUri then
+        -- LocationLink
+        callback({
+          uri = location.targetUri,
+          range = location.targetRange or location.targetSelectionRange
+        })
+      else
+        -- Location
+        callback({
+          uri = location.uri,
+          range = location.range
+        })
+      end
+    else
+      callback(nil)
+    end
+  end, 0)
+end
+
 -- Jump to symbol using LSP document symbols
 ---@param symbol_path table Array of symbol names (e.g., {"pipeline1"} or {"pipeline1", "pipeline", "filter"})
 ---@param callback function|nil Optional callback after jump completes
@@ -407,23 +481,16 @@ local function jump_to_symbol_lsp(symbol_path, callback)
 
       -- If this is the only element in the path, jump to its type definition
       if #symbol_path == 1 then
-        local range = first_instance.location and first_instance.location.range or first_instance.range
-        if range and range.start then
-          local line = range.start.line + 1
-          vim.api.nvim_win_set_cursor(0, { line, range.start.character })
-
-          local line_text = vim.fn.getline(line)
-          local type_start = line_text:find("new%s+")
-          if type_start then
-            local type_name_start = line_text:match("^%s*()", type_start + 4)
-            if type_name_start then
-              vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
-              vim.defer_fn(function()
-                vim.lsp.buf.definition()
-              end, 100)
-            end
+        get_type_definition_location(client, first_instance, function(location)
+          if location and location.range then
+            local target_line = location.range.start.line + 1
+            local target_char = location.range.start.character
+            vim.api.nvim_win_set_cursor(0, { target_line, target_char })
+            vim.cmd('normal! zz')
+          else
+            vim.notify("Could not resolve type definition for " .. symbol_path[1], vim.log.levels.WARN)
           end
-        end
+        end)
         return
       end
 
@@ -459,23 +526,16 @@ local function jump_to_symbol_lsp(symbol_path, callback)
 
         -- If this is the final target, jump to its type definition
         if path_index == #symbol_path then
-          local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
-          if range and range.start then
-            local line = range.start.line + 1
-            vim.api.nvim_win_set_cursor(0, { line, range.start.character })
-
-            local line_text = vim.fn.getline(line)
-            local type_start = line_text:find("new%s+")
-            if type_start then
-              local type_name_start = line_text:match("^%s*()", type_start + 4)
-              if type_name_start then
-                vim.api.nvim_win_set_cursor(0, { line, type_name_start - 1 })
-                vim.defer_fn(function()
-                  vim.lsp.buf.definition()
-                end, 100)
-              end
+          get_type_definition_location(client, instance_symbol, function(location)
+            if location and location.range then
+              local target_line = location.range.start.line + 1
+              local target_char = location.range.start.character
+              vim.api.nvim_win_set_cursor(0, { target_line, target_char })
+              vim.cmd('normal! zz')
+            else
+              vim.notify("Could not resolve type definition for " .. target_instance_name, vim.log.levels.WARN)
             end
-          end
+          end)
         else
           -- Not the final target - extract the type name and continue navigating
           local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
