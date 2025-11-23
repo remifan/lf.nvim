@@ -99,6 +99,12 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
         library = "<leader>ll",
         show_ast = "<leader>la",
       },
+
+      -- Diagram settings
+      diagram = {
+        no_browser = true,  -- Default: show URL without auto-opening browser (good for SSH)
+                            -- Set to false to auto-open browser locally
+      },
     })
   end,
 }
