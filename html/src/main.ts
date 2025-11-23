@@ -90,6 +90,7 @@ class LFDiagramViewer {
                 setTimeout(() => {
                     dispatcher.dispatch({
                         kind: 'fit',
+                        elementIds: [],  // Empty array means fit entire diagram
                         padding: 20,
                         maxZoom: 1,
                         animate: true
