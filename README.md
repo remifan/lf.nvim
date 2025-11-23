@@ -102,8 +102,9 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
 
       -- Diagram settings
       diagram = {
-        no_browser = true,  -- Default: show URL without auto-opening browser (good for SSH)
-                            -- Set to false to auto-open browser locally
+        no_browser = true,   -- Default: show URL without auto-opening browser (good for SSH)
+                             -- Set to false to auto-open browser locally
+        auto_update = true,  -- Auto-refresh diagram when switching between LF files
       },
     })
   end,
@@ -216,15 +217,16 @@ The diagram viewer provides an interactive browser-based view of your reactors:
 1. Open a `.lf` file
 2. Run `:LFDiagramOpen`
 3. **First time only**: Dependencies build automatically (may take a few minutes)
-4. Browser opens with interactive diagram
+4. Browser opens with interactive diagram at `http://localhost:8765/`
 5. **Click elements** to jump to source code in Neovim
-6. Zoom, pan, and explore reactor structure
+6. **Switch files** in Neovim - diagram auto-updates (with `auto_update = true`)
+7. Zoom, pan, and explore reactor structure
 
 **Requirements**: Node.js must be installed for diagram features.
 
 **Troubleshooting**: If auto-build fails, run `:LFDiagramBuild` manually to retry.
 
-**Architecture**: Uses Node.js sidecar to bridge browser ↔ Neovim communication.
+**Architecture**: Uses Node.js sidecar to bridge browser ↔ Neovim communication. The browser connects to a singleton server, and diagrams reactively update as you navigate files.
 
 ### SSH/Remote Work
 
@@ -235,7 +237,9 @@ By default, diagrams show a URL without auto-opening the browser. Use SSH port f
 ssh -L 8765:localhost:8765 user@remote-server
 ```
 
-When you run `:LFDiagramOpen`, Neovim displays the URL. Copy it to your local browser at `http://localhost:8765/?file=...`
+When you run `:LFDiagramOpen`, Neovim displays the URL. Open it in your local browser at `http://localhost:8765/`
+
+The diagram will show the current file and auto-update as you switch between files (no file parameter needed in the URL).
 
 **To auto-open browser locally** (disable no-browser mode):
 
