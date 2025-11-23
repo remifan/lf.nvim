@@ -18,19 +18,9 @@ import { DiagramConnection } from './diagram-connection';
 class LFDiagramViewer {
     private container: Container | null = null;
     private connection: DiagramConnection | null = null;
-    private fileUri: string;
     private currentModel: any = null;
 
     constructor() {
-        // Get file URI from URL parameters
-        const params = new URLSearchParams(window.location.search);
-        this.fileUri = params.get('file') || '';
-
-        if (!this.fileUri) {
-            this.showError('No file specified in URL parameters');
-            return;
-        }
-
         this.initialize();
     }
 
@@ -81,11 +71,18 @@ class LFDiagramViewer {
 
             this.updateStatus('connected', 'Connected - Requesting diagram...');
 
-            console.log('[Viewer] Connected! Requesting diagram for:', this.fileUri);
+            console.log('[Viewer] Connected! Requesting diagram from LSP...');
 
-            // Request the diagram model from LSP via Neovim
+            // Get dispatcher and request model
+            // The browser initiates the diagram request, which goes through the sidecar to Neovim to LSP
             const dispatcher = getActionDispatcher(this.container);
-            await requestModel(dispatcher, this.fileUri);
+
+            // Give the SVG container time to render in the DOM
+            // This is needed for bounds computation to work
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Request diagram with a placeholder clientId - Neovim will provide the actual file URI
+            await requestModel(dispatcher, 'lf-diagram-viewer');
 
             // Wait for diagram to be fully loaded, then center it
             window.addEventListener('diagram-ready', () => {
@@ -99,6 +96,13 @@ class LFDiagramViewer {
                     } as any);
                 }, 200);
             }, { once: true });
+
+            // Listen for refresh requests from Neovim via custom event
+            window.addEventListener('refresh-diagram', () => {
+                console.log('[Viewer] 🔄 Refresh requested from Neovim, requesting new diagram...');
+                // Trigger a new requestModel to get updated diagram
+                requestModel(dispatcher, 'lf-diagram-viewer');
+            });
 
             // Listen for model and element selection via custom events from connection
             window.addEventListener('diagram-model-received', ((event: CustomEvent) => {

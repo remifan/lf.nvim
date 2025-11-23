@@ -142,6 +142,32 @@ function M.handle_rpc_message(data)
                             local diagram_klighd = require('lf.diagram_klighd')
                             diagram_klighd.handle_element_click(action)
                         end)
+                    elseif action.kind == 'requestModel' then
+                        -- Browser is requesting a diagram
+                        -- Inject the current file's URI and forward to LSP
+                        vim.schedule(function()
+                            if vim.bo.filetype == 'lf' then
+                                local current_file = vim.fn.expand("%:p")
+                                if current_file ~= "" then
+                                    local uri = vim.uri_from_fname(current_file)
+
+                                    -- Update the action with the current file's URI and layout options
+                                    local modified_action = vim.tbl_deep_extend('force', action_msg, {
+                                        action = vim.tbl_deep_extend('force', action, {
+                                            options = vim.tbl_deep_extend('force', action.options or {}, {
+                                                sourceUri = uri,
+                                                needsClientLayout = false,  -- Server does layout
+                                                needsServerLayout = true    -- Server does layout
+                                            })
+                                        })
+                                    })
+
+                                    -- Forward to LSP via diagram/accept notification
+                                    local lsp = require('lf.lsp')
+                                    lsp.notify_server('diagram/accept', modified_action)
+                                end
+                            end
+                        end)
                     else
                         -- Forward other actions to LSP via diagram/accept notification
                         -- The LSP will process it and might send back diagram/accept or diagram/openInTextEditor
@@ -149,6 +175,7 @@ function M.handle_rpc_message(data)
                         lsp.notify_server('diagram/accept', action_msg)
                     end
                 elseif message.method == 'browser/connected' then
+                    -- Browser will send RequestModel action automatically
                     -- Silently ignore
                 elseif message.method == 'browser/disconnected' then
                     -- Silently ignore

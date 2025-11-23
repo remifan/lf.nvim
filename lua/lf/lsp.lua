@@ -147,7 +147,7 @@ function M.start()
       -- Handle diagram updates from LSP server
       ["diagram/accept"] = function(err, result, ctx, config)
         if err then
-          vim.notify("Diagram notification error: " .. err.message, vim.log.levels.ERROR)
+          vim.notify("Diagram error: " .. err.message, vim.log.levels.ERROR)
           return
         end
 
@@ -156,8 +156,6 @@ function M.start()
         local sidecar = require("lf.sidecar")
         if sidecar.is_running() then
           sidecar.send_action_to_browser(result)
-        else
-          -- Silently ignore
         end
       end,
 

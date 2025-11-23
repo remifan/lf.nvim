@@ -48,6 +48,8 @@ M.config = {
   diagram = {
     -- Don't auto-open browser (useful for SSH)
     no_browser = true,
+    -- Auto-update diagram when switching files (requires diagram viewer to be open)
+    auto_update = true,
   },
 }
 
@@ -192,6 +194,25 @@ local function setup_autocmds()
       setup_keymaps(args.buf)
     end,
   })
+
+  -- Auto-update diagram when switching to LF buffer (if diagram viewer is open)
+  if M.config.diagram.auto_update then
+    vim.api.nvim_create_autocmd("BufEnter", {
+      group = augroup,
+      pattern = "*.lf",
+      callback = function()
+        -- Only update if diagram viewer is already running
+        local sidecar = require("lf.sidecar")
+        if sidecar.is_running() then
+          local diagram_klighd = require("lf.diagram_klighd")
+          -- Small delay to let buffer fully load
+          vim.defer_fn(function()
+            diagram_klighd.request_diagram_for_current_file()
+          end, 100)
+        end
+      end,
+    })
+  end
 end
 
 -- Check if platform supports LSP (Mac/Linux only, LF doesn't support Windows)

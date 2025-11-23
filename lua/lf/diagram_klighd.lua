@@ -184,9 +184,8 @@ function M.open()
 
   -- Wait for sidecar to be ready, then open browser or display URL
   vim.defer_fn(function()
-    local uri = vim.uri_from_fname(current_file)
     local port = sidecar.get_http_port()
-    local url = string.format("http://localhost:%d/?file=%s", port, uri)
+    local url = string.format("http://localhost:%d/", port)
 
     -- Get configuration
     local lf = require('lf')
@@ -213,7 +212,8 @@ function M.open()
       vim.fn.jobstart({ browser_cmd, url }, { detach = true })
     end
 
-    -- Enable diagram sync (cursor tracking)
+    -- Browser will automatically request diagram when it connects
+    -- Enable diagram sync (cursor tracking) after a delay
     vim.defer_fn(function()
       local sync = require("lf.diagram_sync")
       sync.set_enabled(true)
@@ -221,51 +221,39 @@ function M.open()
   end, 3000)
 end
 
--- Request diagram from LSP server
+-- Request diagram from LSP server and push to browser
+-- This is used for reactive updates when switching files
 ---@param file_path string
 function M.request_diagram(file_path)
-  local uri = vim.uri_from_fname(file_path)
-
-  -- Get the LF LSP client
-  local client = nil
-  local lsp_clients = vim.lsp.get_clients and vim.lsp.get_clients() or vim.lsp.get_active_clients()
-  for _, c in ipairs(lsp_clients) do
-    if c.name == "lf-language-server" then
-      client = c
-      break
-    end
-  end
-
-  if not client then
-    vim.notify("LF LSP client not found", vim.log.levels.ERROR)
+  -- Check if sidecar is running (browser is connected)
+  local sidecar = require("lf.sidecar")
+  if not sidecar.is_running() then
     return
   end
 
-  -- Silently ignore
+  -- Instead of sending directly to LSP, trigger the browser to send a new requestModel
+  -- This ensures the full bounds computation cycle works correctly
+  -- We send a special action to tell the browser to refresh
+  sidecar.send_action_to_browser({
+    clientId = "lf-diagram-viewer",
+    action = {
+      kind = "refreshDiagram"  -- Custom action to trigger browser refresh
+    }
+  })
+end
 
-  -- Send workspace/executeCommand to generate diagram
-  local params = {
-    command = "diagram/generate",
-    arguments = { uri }
-  }
+-- Request diagram for current file (helper)
+function M.request_diagram_for_current_file()
+  if vim.bo.filetype ~= 'lf' then
+    return
+  end
 
-  client.request("workspace/executeCommand", params, function(err, result)
-    if err then
-      vim.notify("Diagram request failed: " .. vim.inspect(err), vim.log.levels.ERROR)
-      return
-    end
+  local current_file = vim.fn.expand("%:p")
+  if current_file == "" then
+    return
+  end
 
-    if result then
-      -- Silently ignore
-
-      -- Send diagram model to browser via sidecar
-      local sidecar = require("lf.sidecar")
-      sidecar.send_action_to_browser({
-        clientId = uri,
-        action = result  -- result should be a SetModelAction
-      })
-    end
-  end, 0)  -- buffer 0 = current buffer
+  M.request_diagram(current_file)
 end
 
 -- Parse element ID to extract symbol path

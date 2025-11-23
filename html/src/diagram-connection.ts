@@ -47,7 +47,11 @@ export class DiagramConnection implements Connection {
                 }
             }
         } else {
-            console.log('[Connection] Sending action to sidecar:', message);
+            console.log(`[Connection] Sending action to sidecar: ${action?.kind || 'unknown'}`);
+            // Log computedBounds being sent
+            if (action?.kind === 'computedBounds') {
+                console.log('[Connection] 📐 Sending computedBounds response');
+            }
         }
 
         if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
@@ -74,6 +78,13 @@ export class DiagramConnection implements Connection {
 
         // Wrap the handler to detect when diagram is loaded
         this.messageHandler = (message: ActionMessage) => {
+            // Handle custom refresh action from Neovim
+            if (message.action && (message.action as any).kind === 'refreshDiagram') {
+                console.log('[Connection] 🔄 Refresh requested from Neovim');
+                window.dispatchEvent(new CustomEvent('refresh-diagram'));
+                return; // Don't forward this to KLighD
+            }
+
             handler(message);
 
             // Check if this is a SetModel or UpdateModel action (diagram loaded/updated)
@@ -137,6 +148,11 @@ export class DiagramConnection implements Connection {
                         // Log action kind for easier tracking
                         if (message.action && message.action.kind) {
                             console.log(`[Connection] Action kind: ${message.action.kind}`);
+                        }
+
+                        // Check for setModel action to detect when diagram updates
+                        if (message.action && message.action.kind === 'setModel') {
+                            console.log('[Connection] ✨ Received new diagram model!');
                         }
 
                         // Forward to KLighD's message handler
