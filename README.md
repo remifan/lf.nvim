@@ -220,6 +220,27 @@ The diagram viewer provides an interactive browser-based view of your reactors:
 
 **Architecture**: Uses Node.js sidecar to bridge browser ↔ Neovim communication.
 
+### SSH/Remote Work
+
+For SSH sessions, enable no-browser mode to get a URL you can copy:
+
+```lua
+require("lf").setup({
+  diagram = {
+    no_browser = true,  -- Don't auto-open browser, just show URL
+  },
+})
+```
+
+Then use SSH port forwarding:
+
+```bash
+# On your local machine
+ssh -L 8765:localhost:8765 user@remote-server
+```
+
+When you run `:LFDiagramOpen`, Neovim displays the URL. Copy it to your local browser at `http://localhost:8765/?file=...`
+
 ## 🎨 Syntax Highlighting Details
 
 ### Lingua Franca Keywords

@@ -182,33 +182,41 @@ function M.open()
     end
   end
 
-  -- Wait for sidecar to be ready, then open browser
-  -- The browser will send RequestModelAction which triggers diagram generation
+  -- Wait for sidecar to be ready, then open browser or display URL
   vim.defer_fn(function()
     local uri = vim.uri_from_fname(current_file)
     local port = sidecar.get_http_port()
     local url = string.format("http://localhost:%d/?file=%s", port, uri)
 
-    -- Silently ignore
+    -- Get configuration
+    local lf = require('lf')
+    local no_browser = lf.config.diagram.no_browser
 
-    local browser_cmd
-    if vim.fn.has("mac") == 1 then
-      browser_cmd = "open"
-    elseif vim.fn.has("unix") == 1 then
-      browser_cmd = "xdg-open"
-    else
-      vim.notify("Could not detect browser command", vim.log.levels.ERROR)
-      return
+    -- Always display the URL
+    vim.notify(
+      string.format("Diagram viewer available at:\n%s", url),
+      vim.log.levels.INFO
+    )
+
+    -- Auto-open browser unless no_browser is set
+    if not no_browser then
+      local browser_cmd
+      if vim.fn.has("mac") == 1 then
+        browser_cmd = "open"
+      elseif vim.fn.has("unix") == 1 then
+        browser_cmd = "xdg-open"
+      else
+        vim.notify("Could not detect browser command. Use the URL above to open manually.", vim.log.levels.WARN)
+        return
+      end
+
+      vim.fn.jobstart({ browser_cmd, url }, { detach = true })
     end
-
-    vim.fn.jobstart({ browser_cmd, url }, { detach = true })
-    -- Silently ignore
 
     -- Enable diagram sync (cursor tracking)
     vim.defer_fn(function()
       local sync = require("lf.diagram_sync")
       sync.set_enabled(true)
-      -- Silently ignore
     end, 1000)
   end, 3000)
 end

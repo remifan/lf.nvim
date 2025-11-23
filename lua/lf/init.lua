@@ -45,6 +45,10 @@ M.config = {
     library = "<leader>ll",
     diagram = "<leader>ld",
   },
+  diagram = {
+    -- Don't auto-open browser (useful for SSH)
+    no_browser = false,
+  },
 }
 
 -- Merge user config with defaults
