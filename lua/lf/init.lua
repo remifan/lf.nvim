@@ -118,10 +118,8 @@ local function validate_config(config)
     local found_jar = find_lsp_jar()
     if found_jar then
       config.lsp.jar_path = found_jar
-      vim.notify(
-        "lf.nvim: Found LSP JAR at: " .. found_jar,
-        vim.log.levels.INFO
-      )
+      -- Use echo instead of notify to avoid blocking
+      vim.cmd(string.format('echom "lf.nvim: Found LSP JAR at: %s"', found_jar))
     else
       vim.notify(
         "lf.nvim: LSP JAR not found. Please build and configure it.\n\n" ..
