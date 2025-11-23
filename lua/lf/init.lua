@@ -47,7 +47,7 @@ M.config = {
   },
   diagram = {
     -- Don't auto-open browser (useful for SSH)
-    no_browser = false,
+    no_browser = true,
   },
 }
 
