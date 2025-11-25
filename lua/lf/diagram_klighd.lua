@@ -343,6 +343,26 @@ local function find_instance_in_reactor(reactor_symbol, instance_name)
   return nil
 end
 
+-- Extract reactor type name from an instantiation line
+-- Handles all LF instantiation patterns:
+--   instance = new TypeName()           -- standard
+--   instance = new TypeName(args)       -- with arguments
+--   instance = new[width] TypeName()    -- banked with literal width
+--   instance = new[expr] TypeName(args) -- banked with expression and arguments
+---@param line_text string The line of code containing the instantiation
+---@return string|nil type_name The extracted type name, or nil if not found
+local function extract_type_name_from_instantiation(line_text)
+  -- Pattern 1: new[...] TypeName - banked reactor (handles any expression in brackets)
+  local type_name = line_text:match("new%s*%[.-%]%s*(%w+)")
+  if type_name then
+    return type_name
+  end
+
+  -- Pattern 2: new TypeName - standard instantiation (no brackets)
+  type_name = line_text:match("new%s+(%w+)")
+  return type_name
+end
+
 -- Helper function to get type definition location without moving cursor
 -- Extracts the type name from an instance declaration and resolves its definition
 local function get_type_definition_location(client, instance_symbol, callback)
@@ -355,23 +375,31 @@ local function get_type_definition_location(client, instance_symbol, callback)
   local line = range.start.line + 1
   local line_text = vim.fn.getline(line)
 
-  -- Extract type name from "instance = new TypeName()" pattern
-  local type_name = line_text:match("new%s+(%w+)")
+  -- Extract type name from instantiation (handles standard and banked patterns)
+  local type_name = extract_type_name_from_instantiation(line_text)
   if not type_name then
     callback(nil)
     return
   end
 
-  -- Find the position of the type name in the line
-  local type_start_pos = line_text:find("new%s+" .. vim.pesc(type_name))
-  if not type_start_pos then
+  -- Find the character position of the type name in the line
+  -- Handle both: "new TypeName" and "new[width] TypeName"
+  local type_char_pos = line_text:find(vim.pesc(type_name) .. "%s*%(")
+  if not type_char_pos then
+    -- Fallback: just find the type name anywhere after "new"
+    local new_pos = line_text:find("new")
+    if new_pos then
+      type_char_pos = line_text:find(vim.pesc(type_name), new_pos)
+    end
+  end
+
+  if not type_char_pos then
     callback(nil)
     return
   end
 
-  -- Calculate the character position of the type name (after "new ")
-  local type_char_pos = type_start_pos + 3  -- skip "new"
-  type_char_pos = line_text:match("^%s*()", type_char_pos + 1) - 1  -- find first non-whitespace
+  -- Convert to 0-indexed for LSP
+  type_char_pos = type_char_pos - 1
 
   -- Make LSP definition request at the type name position
   local params = {
@@ -493,10 +521,12 @@ local function jump_to_symbol_lsp(symbol_path, callback)
       if #symbol_path == 1 then
         get_type_definition_location(client, first_instance, function(location)
           if location and location.range then
-            local target_line = location.range.start.line + 1
-            local target_char = location.range.start.character
-            vim.api.nvim_win_set_cursor(0, { target_line, target_char })
-            vim.cmd('normal! zz')
+            vim.schedule(function()
+              local target_line = location.range.start.line + 1
+              local target_char = location.range.start.character
+              vim.api.nvim_win_set_cursor(0, { target_line, target_char })
+              vim.cmd('normal! zz')
+            end)
           end
           -- If location is nil, it's likely an external reactor - do nothing (VSCode behavior)
         end)
@@ -539,10 +569,12 @@ local function jump_to_symbol_lsp(symbol_path, callback)
         if path_index == #symbol_path then
           get_type_definition_location(client, instance_symbol, function(location)
             if location and location.range then
-              local target_line = location.range.start.line + 1
-              local target_char = location.range.start.character
-              vim.api.nvim_win_set_cursor(0, { target_line, target_char })
-              vim.cmd('normal! zz')
+              vim.schedule(function()
+                local target_line = location.range.start.line + 1
+                local target_char = location.range.start.character
+                vim.api.nvim_win_set_cursor(0, { target_line, target_char })
+                vim.cmd('normal! zz')
+              end)
             end
             -- If location is nil, it's likely an external reactor - do nothing (VSCode behavior)
           end)
@@ -553,8 +585,8 @@ local function jump_to_symbol_lsp(symbol_path, callback)
             local line = range.start.line + 1
             local line_text = vim.fn.getline(line)
 
-            -- Extract type name from "instance = new TypeName()" pattern
-            local type_name = line_text:match("new%s+(%w+)")
+            -- Extract type name (handles standard and banked patterns)
+            local type_name = extract_type_name_from_instantiation(line_text)
             if type_name then
               navigate_nested_path(path_index + 1, type_name)
             end
@@ -573,7 +605,7 @@ local function jump_to_symbol_lsp(symbol_path, callback)
 
       local line = range.start.line + 1
       local line_text = vim.fn.getline(line)
-      local first_type_name = line_text:match("new%s+(%w+)")
+      local first_type_name = extract_type_name_from_instantiation(line_text)
 
       if not first_type_name then
         vim.notify("Could not extract type name from first instance", vim.log.levels.WARN)
