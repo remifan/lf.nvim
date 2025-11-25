@@ -227,7 +227,6 @@ The diagram viewer provides an interactive browser-based view of your reactors:
 - [x] Diagram → Code: Click reactor instances to jump to definition in Neovim
 - [x] Support for standard and banked reactor instances (`new[width] Type()`)
 - [x] Auto-refresh diagram when switching between LF files
-- [x] SSH-friendly: URL display mode for remote development
 - [ ] Code → Diagram: Sync cursor position to highlight elements in diagram
 - [ ] Diagram element search/filter
 
