@@ -2,6 +2,8 @@
 
 Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with syntax highlighting, LSP support, and interactive diagram viewing.
 
+![lf.nvim demo](assets/preview.gif)
+
 ## ✨ Features
 
 ### 🎨 Syntax Highlighting (Always Available)
