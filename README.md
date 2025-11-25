@@ -249,6 +249,7 @@ require("lf").setup({
     no_browser = false,  -- Auto-open browser
   },
 })
+```
 
 ## 🎨 Syntax Highlighting Details
 
