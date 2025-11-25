@@ -222,6 +222,15 @@ The diagram viewer provides an interactive browser-based view of your reactors:
 6. **Switch files** in Neovim - diagram auto-updates (with `auto_update = true`)
 7. Zoom, pan, and explore reactor structure
 
+**Features:**
+- [x] Interactive KLighD diagram rendering in browser
+- [x] Diagram → Code: Click reactor instances to jump to definition in Neovim
+- [x] Support for standard and banked reactor instances (`new[width] Type()`)
+- [x] Auto-refresh diagram when switching between LF files
+- [x] SSH-friendly: URL display mode for remote development
+- [ ] Code → Diagram: Sync cursor position to highlight elements in diagram
+- [ ] Diagram element search/filter
+
 **Requirements**: Node.js must be installed for diagram features.
 
 **Troubleshooting**: If auto-build fails, run `:LFDiagramBuild` manually to retry.
