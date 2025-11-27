@@ -118,20 +118,20 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
 For modern syntax highlighting, incremental selection, and textobjects:
 
 ```vim
-:LFInstall
+:LFTSInstall
 ```
 
 This installs the LF tree-sitter parser and query files. Requires:
 - `nvim-treesitter` plugin
 - C compiler (gcc or clang) if compiling from source
 
-**Treesitter Commands:**
+**Tree-sitter Commands:**
 
 | Command | Description |
 |---------|-------------|
-| `:LFInstall` | Install LF tree-sitter parser and queries |
-| `:LFInstall!` | Force reinstall (with bang) |
-| `:LFUninstall` | Remove LF tree-sitter parser |
+| `:LFTSInstall` | Install LF tree-sitter parser and queries |
+| `:LFTSInstall!` | Force reinstall (with bang) |
+| `:LFTSUninstall` | Remove LF tree-sitter parser |
 | `:LFTSStatus` | Show tree-sitter installation status |
 
 **Incremental Selection** (with nvim-treesitter configured):

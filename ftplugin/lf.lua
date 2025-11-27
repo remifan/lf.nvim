@@ -1,6 +1,11 @@
 -- Filetype plugin for Lingua Franca
 -- Sets buffer-local options and configurations
 
+-- Start tree-sitter highlighting if parser is available
+if pcall(vim.treesitter.language.inspect, "lf") then
+  vim.treesitter.start(vim.api.nvim_get_current_buf(), "lf")
+end
+
 -- Set comment string for commentary.vim and similar plugins
 vim.bo.commentstring = "// %s"
 

@@ -360,6 +360,13 @@ function M.uninstall()
     removed = true
   end
 
+  -- Also clean up any stale queries in site directory (legacy location)
+  local site_queries = vim.fn.stdpath("data") .. "/site/queries/lf"
+  if vim.fn.isdirectory(site_queries) == 1 then
+    vim.fn.delete(site_queries, "rf")
+    removed = true
+  end
+
   if removed then
     vim.notify("[lf.nvim] LF treesitter parser uninstalled.", vim.log.levels.INFO)
     pcall(vim._ts_remove_language, "lf")

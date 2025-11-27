@@ -224,26 +224,26 @@ function M.setup()
   })
 
   -- Treesitter installation commands
-  vim.api.nvim_create_user_command("LFInstall", function(opts)
+  vim.api.nvim_create_user_command("LFTSInstall", function(opts)
     local treesitter = require("lf.treesitter")
     treesitter.install({ force = opts.bang })
   end, {
     bang = true,
-    desc = "Install LF treesitter parser and queries (use ! to force reinstall)",
+    desc = "Install LF tree-sitter parser and queries (use ! to force reinstall)",
   })
 
-  vim.api.nvim_create_user_command("LFUninstall", function()
+  vim.api.nvim_create_user_command("LFTSUninstall", function()
     local treesitter = require("lf.treesitter")
     treesitter.uninstall()
   end, {
-    desc = "Uninstall LF treesitter parser and queries",
+    desc = "Uninstall LF tree-sitter parser and queries",
   })
 
   vim.api.nvim_create_user_command("LFTSStatus", function()
     local treesitter = require("lf.treesitter")
     treesitter.status()
   end, {
-    desc = "Show LF treesitter installation status",
+    desc = "Show LF tree-sitter installation status",
   })
 
   -- Target position command

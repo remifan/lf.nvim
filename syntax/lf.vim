@@ -7,6 +7,12 @@ if exists("b:current_syntax")
   finish
 endif
 
+" Skip regex syntax if tree-sitter highlighting is available
+" Tree-sitter provides better highlighting especially for embedded code blocks
+if has('nvim') && luaeval('pcall(vim.treesitter.language.inspect, "lf")')
+  finish
+endif
+
 " Save current syntax name
 let s:cpo_save = &cpo
 set cpo&vim
