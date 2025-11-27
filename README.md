@@ -7,7 +7,7 @@ Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with s
 ## ✨ Features
 
 ### 🎨 Syntax Highlighting (Always Available)
-- **Tree-sitter support** - Modern, accurate syntax highlighting with `:LFInstall`
+- **Tree-sitter support** - Modern, accurate syntax highlighting with `:LFTSInstall`
 - **Incremental selection** - Expand/shrink selection by AST nodes (works with nvim-treesitter)
 - **Textobjects** - Select functions, classes, parameters with treesitter-textobjects
 - **Embedded language support** - Proper highlighting for C/C++, Python, TypeScript, and Rust code blocks
@@ -195,33 +195,41 @@ If neither above is set, searches common locations:
 
 ## 🚀 Usage
 
-### Syntax Highlighting Commands
-
-Available in all modes (no LSP required):
-
-| Command | Description |
-|---------|-------------|
-| `:LFInfo` | Show plugin configuration and detected target language |
-| `:LFDetectTarget` | Manually detect target language from current buffer |
-| `:LFUpdateSyntax` | Update syntax from VSCode extension (requires internet) |
-| `:LFUpdateSyntaxDryRun` | Preview available syntax updates |
-| `:LFShowKeywords` | Display all LF keywords from VSCode grammar |
-
 ### LSP Commands
 
-Only available when LSP is enabled (Mac/Linux):
+Available when LSP is enabled (Mac/Linux):
 
 | Command | Description |
 |---------|-------------|
-| `:LFBuild` | Build current LF program |
-| `:LFRun` | Build and run current LF program |
-| `:LFDiagramOpen` | Open interactive KLighD diagram in browser (auto-builds on first use) |
-| `:LFDiagramBuild` | Manually build diagram dependencies (if auto-build fails) |
+| `:LFBuild [args]` | Build current LF program |
+| `:LFRun [args]` | Build and run current LF program |
+| `:LFCancel` | Cancel current build |
+| `:LFValidate` | Validate current file (no compilation) |
+| `:LFInfo` | Show LSP server status and capabilities |
+| `:LFStart` | Start LSP server |
+| `:LFStop` | Stop LSP server |
+| `:LFRestart` | Restart LSP server |
+
+### Diagram Commands
+
+| Command | Description |
+|---------|-------------|
+| `:LFDiagramOpen` | Open interactive KLighD diagram in browser |
+| `:LFDiagram` | Alias for `:LFDiagramOpen` |
 | `:LFDiagramClose` | Close diagram viewer |
-| `:LFLibrary` | Browse reactor library (uses Telescope if available) |
+| `:LFDiagramToggle` | Toggle diagram viewer on/off |
+| `:LFDiagramBuild` | Manually build diagram dependencies |
+| `:LFDiagramExport` | Generate and view static diagram |
+| `:LFExportDiagram [file] [format]` | Export diagram to file (svg, png, pdf) |
+
+### Other Commands
+
+| Command | Description |
+|---------|-------------|
 | `:LFShowAST` | Show abstract syntax tree |
-| `:LFLspInfo` | Show LSP server status |
-| `:LFLspRestart` | Restart LSP server |
+| `:LFExportAST [file]` | Export AST to file (default: `<filename>.sexp`) |
+| `:LFLibrary` | Browse reactor library (uses Telescope if available) |
+| `:LFTargetPosition` | Jump to target declaration |
 
 ### Default Keybindings (LSP Mode)
 
@@ -314,22 +322,6 @@ Code within `{= =}` delimiters gets full syntax highlighting:
 - Block comments: `/* */`
 - TODO/FIXME highlighting
 
-## 🔄 Keeping Syntax Updated
-
-Sync with the official VSCode extension:
-
-```vim
-:LFUpdateSyntax
-```
-
-Or from command line:
-
-```bash
-nvim -l scripts/update_syntax.lua
-```
-
-See [UPDATING.md](UPDATING.md) for details.
-
 ## 📖 Documentation
 
 Comprehensive help documentation:
@@ -386,8 +378,9 @@ cd diagram-server && npm install
 ### Syntax Highlighting Not Working
 
 1. Verify filetype is detected: `:set ft?` should show `filetype=lf`
-2. Force syntax reload: `:syntax sync fromstart`
-3. Check for conflicting plugins
+2. Check tree-sitter status: `:LFTSStatus`
+3. Try reinstalling tree-sitter: `:LFTSInstall!`
+4. Check for conflicting plugins
 
 ### LSP Server Not Starting
 
