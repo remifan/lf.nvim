@@ -223,6 +223,29 @@ function M.setup()
     desc = "Show LF Language Server information",
   })
 
+  -- Treesitter installation commands
+  vim.api.nvim_create_user_command("LFInstall", function(opts)
+    local treesitter = require("lf.treesitter")
+    treesitter.install({ force = opts.bang })
+  end, {
+    bang = true,
+    desc = "Install LF treesitter parser and queries (use ! to force reinstall)",
+  })
+
+  vim.api.nvim_create_user_command("LFUninstall", function()
+    local treesitter = require("lf.treesitter")
+    treesitter.uninstall()
+  end, {
+    desc = "Uninstall LF treesitter parser and queries",
+  })
+
+  vim.api.nvim_create_user_command("LFTSStatus", function()
+    local treesitter = require("lf.treesitter")
+    treesitter.status()
+  end, {
+    desc = "Show LF treesitter installation status",
+  })
+
   -- Target position command
   vim.api.nvim_create_user_command("LFTargetPosition", function()
     local lsp = require("lf.lsp")

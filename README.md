@@ -7,12 +7,12 @@ Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with s
 ## ✨ Features
 
 ### 🎨 Syntax Highlighting (Always Available)
-- **Complete syntax highlighting** for Lingua Franca files
+- **Tree-sitter support** - Modern, accurate syntax highlighting with `:LFInstall`
+- **Incremental selection** - Expand/shrink selection by AST nodes (works with nvim-treesitter)
+- **Textobjects** - Select functions, classes, parameters with treesitter-textobjects
 - **Embedded language support** - Proper highlighting for C/C++, Python, TypeScript, and Rust code blocks
 - **Automatic target detection** - Detects target language from `target` declarations
-- **Smart keyword management** - Built-in updater syncs with official VSCode extension
-- **Time unit highlighting** - Special highlighting for `nsec`, `msec`, `sec`, etc.
-- **Code folding** - Fold reactor and preamble blocks
+- **Fallback regex syntax** - Works without treesitter for basic highlighting
 - **Cross-platform** - Works on Mac, Linux, and Windows
 
 ### 🚀 LSP Features (Mac/Linux Only)
@@ -112,6 +112,32 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
   end,
 }
 ```
+
+## 🌳 Tree-sitter Setup
+
+For modern syntax highlighting, incremental selection, and textobjects:
+
+```vim
+:LFInstall
+```
+
+This installs the LF tree-sitter parser and query files. Requires:
+- `nvim-treesitter` plugin
+- C compiler (gcc or clang) if compiling from source
+
+**Treesitter Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `:LFInstall` | Install LF tree-sitter parser and queries |
+| `:LFInstall!` | Force reinstall (with bang) |
+| `:LFUninstall` | Remove LF tree-sitter parser |
+| `:LFTSStatus` | Show tree-sitter installation status |
+
+**Incremental Selection** (with nvim-treesitter configured):
+- Press `<CR>` in normal mode to start selection
+- Press `<CR>` again to expand to next AST node
+- Press `<BS>` to shrink selection
 
 ## 🛠️ LSP Setup (Optional)
 
@@ -227,7 +253,6 @@ The diagram viewer provides an interactive browser-based view of your reactors:
 **Features:**
 - [x] Interactive KLighD diagram rendering in browser
 - [x] Diagram → Code: Click reactor instances to jump to definition in Neovim
-- [x] Support for standard and banked reactor instances (`new[width] Type()`)
 - [x] Auto-refresh diagram when switching between LF files
 - [ ] Code → Diagram: Sync cursor position to highlight elements in diagram
 - [ ] Diagram element search/filter

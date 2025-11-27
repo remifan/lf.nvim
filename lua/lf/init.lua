@@ -234,6 +234,9 @@ function M.setup(user_config)
   -- Always setup syntax highlighting first
   setup_syntax()
 
+  -- Always setup commands (LFInstall, etc. should always be available)
+  require("lf.commands").setup()
+
   -- Check if LSP features should be enabled
   if not M.config.enable_lsp then
     -- Syntax-only mode
@@ -258,9 +261,6 @@ function M.setup(user_config)
   -- Initialize LSP
   local lsp = require("lf.lsp")
   lsp.setup(M.config.lsp)
-
-  -- Setup commands
-  require("lf.commands").setup()
 
   -- Setup autocmds
   setup_autocmds()
