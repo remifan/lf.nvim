@@ -31,7 +31,6 @@ export class DiagramConnection implements Connection {
             // When an element is selected, also send openInSource action
             if (action.kind === 'elementSelected' && action.selectedElementsIDs && action.selectedElementsIDs.length > 0) {
                 const elementId = action.selectedElementsIDs[0];
-                console.log('[Connection] Sending openInSource for element:', elementId);
 
                 // Send the openInSource action separately
                 const openSourceMessage = {

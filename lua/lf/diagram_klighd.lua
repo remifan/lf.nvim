@@ -256,47 +256,105 @@ function M.request_diagram_for_current_file()
   M.request_diagram(current_file)
 end
 
--- Parse element ID to extract symbol path
+-- Parse element ID to extract symbol path and element type info
 ---@param element_id string
----@return table|nil symbol_path Array of symbol names from root to target
+---@return table|nil result Table with symbol_path, element_type, and optional port_info/reaction_info
 local function parse_element_id(element_id)
   -- Element IDs encode the full path from root to target element
   -- Format: "$root$N{parent}_{parent}$N{parent}_{inst1}$N{parent}_{inst1}_{inst2}$N..."
+  --
+  -- Suffixes observed:
+  --   $$P{index} - ports (0-indexed, e.g., "$$P0", "$$P1", "$$P2")
+  --   $$L{index} - labels on ports/reactions (e.g., "$$P2$$L0" = label on port 2)
+  --   $E{index} - edges (ignored)
+  --   _reaction_{index} - reactions (1-indexed in KLighD, e.g., "_reaction_1", "_reaction_2")
+  --
   -- Examples:
-  --   "$root$Nmain_main$Nmain_h" → ["h"]
-  --   "$root$Nmain_main$Nmain_pipeline1$Nmain_pipeline1_pipeline" → ["pipeline1", "pipeline"]
-  --   "$root$Nmain_main$Nmain_pipeline1$Nmain_pipeline1_pipeline$Nmain_pipeline1_pipeline_filter" → ["pipeline1", "pipeline", "filter"]
+  --   "$root$Nmain_main$Nmain_h" → instance "h"
+  --   "$root$Nmain_main$Nmain_h$$P0" → port 0 on instance "h"
+  --   "$root$Nmain_main$Nmain_h$$P2$$L0" → label on port 2 of instance "h"
+  --   "$root$Nmain_main$Nmain_agents$Nmain_agents_reaction_1" → reaction 1 (0-indexed: 0) on "agents"
+
+  local result = {
+    symbol_path = {},
+    element_type = "instance",  -- "instance", "port", or "reaction"
+    port_index = nil,  -- 0-indexed port number
+    reaction_index = nil,  -- 0-indexed reaction number
+  }
+
+  -- Check for label suffix: $$L{index} - strip it first, then process the rest
+  -- Labels appear on ports, reactions, etc. (e.g., "$$P2$$L0" means label 0 on port 2)
+  element_id = element_id:gsub("%$%$L%d+$", "")
+
+  -- Check for port suffix: $$P{index} (0-indexed numeric)
+  -- Must check BEFORE edge check since ports can have edges inside them
+  local port_match = element_id:match("%$%$P(%d+)")
+  if port_match then
+    result.element_type = "port"
+    result.port_index = tonumber(port_match)
+    -- Remove port suffix for path parsing
+    element_id = element_id:gsub("%$%$P%d+.*$", "")
+  end
+
+  -- Check for edge suffix: $E{index} - ignore edges (connections)
+  if element_id:match("%$E%d+$") then
+    return nil
+  end
+
+  -- Check for reaction suffix: _reaction_{index} (1-indexed in KLighD)
+  -- This appears in the last $N segment, e.g., "main_agents_reaction_1"
+  local reaction_match = element_id:match("_reaction_(%d+)$")
+  if reaction_match then
+    result.element_type = "reaction"
+    -- Convert from 1-indexed (KLighD) to 0-indexed (internal)
+    result.reaction_index = tonumber(reaction_match) - 1
+    -- Remove reaction suffix for path parsing
+    element_id = element_id:gsub("_reaction_%d+$", "")
+  end
 
   local parts = vim.split(element_id, "$N")
 
-  if #parts < 3 then
+  if #parts < 2 then
     return nil
+  end
+
+  -- Handle the case where we're clicking on the main reactor itself or its ports
+  if #parts == 2 then
+    -- This is the main reactor level (e.g., "$root$Nmain_main")
+    -- symbol_path stays empty, meaning the main reactor
+    return result
   end
 
   -- Skip first 2 parts: "$root" and parent reactor (e.g., "main_main")
   -- Start from part 3 onwards to extract instance path
-  local symbol_path = {}
 
   -- Each part after index 2 contains the cumulative path
   -- e.g., "main_h", "main_pipeline1", "main_pipeline1_pipeline", etc.
   -- We need to extract just the NEW instance name added at each level
 
+  -- Get the parent name from part 2 (e.g., "main_main" → "main")
+  local parent_part = parts[2]
+  local parent_segments = vim.split(parent_part, "_")
+  local parent_name = parent_segments[#parent_segments]
+
   local prev_cumulative = ""
   for i = 3, #parts do
     local current_part = parts[i]
 
-    -- Strip port suffix if present (e.g., "h$$P0" → "h")
-    current_part = current_part:match("^(.+)%$%$") or current_part
-
     local new_instance = nil
 
     if i == 3 then
-      -- First instance (top-level): strip parent prefix
-      -- Format: "main_h" → "h"
-      local parent_part = parts[2]
-      local parent_segments = vim.split(parent_part, "_")
-      local parent_name = parent_segments[#parent_segments]
+      -- First element after main reactor
+      -- Format: "main_h" → "h" (instance)
+      -- But if current_part equals parent_name, it's still the main reactor
+      -- e.g., "main" from "$Nmain_reaction_1" after stripping "_reaction_1"
+      if current_part == parent_name then
+        -- This is the main reactor itself (e.g., reaction on main reactor)
+        -- symbol_path stays empty
+        break
+      end
 
+      -- Extract instance name by stripping parent prefix
       local pattern = "^" .. vim.pesc(parent_name) .. "_(.+)$"
       new_instance = current_part:match(pattern)
       if not new_instance then
@@ -320,11 +378,11 @@ local function parse_element_id(element_id)
     end
 
     if new_instance then
-      table.insert(symbol_path, new_instance)
+      table.insert(result.symbol_path, new_instance)
     end
   end
 
-  return symbol_path
+  return result
 end
 
 -- Helper function to find an instance child within a reactor's children
@@ -461,8 +519,7 @@ end
 
 -- Jump to symbol using LSP document symbols
 ---@param symbol_path table Array of symbol names (e.g., {"pipeline1"} or {"pipeline1", "pipeline", "filter"})
----@param callback function|nil Optional callback after jump completes
-local function jump_to_symbol_lsp(symbol_path, callback)
+local function jump_to_symbol_lsp(symbol_path)
   -- Get the LF LSP client
   local lsp_clients = vim.lsp.get_clients and vim.lsp.get_clients() or vim.lsp.get_active_clients()
   local client = nil
@@ -617,6 +674,243 @@ local function jump_to_symbol_lsp(symbol_path, callback)
   end, 0)
 end
 
+-- Find a port in source code by searching within the reactor's range
+-- Ports are in LSP symbols but indexed by KLighD as 0-indexed numbers
+---@param reactor_symbol table The reactor symbol from LSP (with range and children)
+---@param port_index number The port index (0-indexed)
+---@return table|nil location Table with range if found
+local function find_port_in_source(reactor_symbol, port_index)
+  local range = reactor_symbol.range or (reactor_symbol.location and reactor_symbol.location.range)
+  if not range then
+    return nil
+  end
+
+  local start_line = range.start.line + 1  -- Convert to 1-indexed
+  local end_line = range["end"].line + 1
+
+  -- Search for input/output declarations within the reactor's range
+  -- Patterns to match:
+  --   input name           (standard)
+  --   input[width] name    (banked)
+  --   output name          (standard)
+  --   output[width] name   (banked)
+  local port_count = 0
+  for line_num = start_line, end_line do
+    local line_text = vim.fn.getline(line_num)
+    -- Match "input" or "output" at the start of a line (with optional whitespace)
+    -- followed by either whitespace (standard) or '[' (banked)
+    if line_text:match("^%s*input[%s%[]") or line_text:match("^%s*output[%s%[]") then
+      if port_count == port_index then
+        -- Find the column where "input" or "output" starts
+        local col = (line_text:find("input") or line_text:find("output")) - 1  -- Convert to 0-indexed
+        return {
+          range = {
+            start = { line = line_num - 1, character = col },  -- Convert back to 0-indexed for LSP format
+            ["end"] = { line = line_num - 1, character = col + 5 }
+          }
+        }
+      end
+      port_count = port_count + 1
+    end
+  end
+
+  return nil
+end
+
+-- Find a reaction in source code by searching within the reactor's range
+-- Reactions are NOT included in LSP document symbols, so we search the source directly
+---@param reactor_symbol table The reactor symbol from LSP (with range)
+---@param reaction_index number The reaction index (0-based)
+---@return table|nil location Table with range if found
+local function find_reaction_in_source(reactor_symbol, reaction_index)
+  local range = reactor_symbol.range or (reactor_symbol.location and reactor_symbol.location.range)
+  if not range then
+    return nil
+  end
+
+  local start_line = range.start.line + 1  -- Convert to 1-indexed
+  local end_line = range["end"].line + 1
+
+  -- Search for reaction declarations within the reactor's range
+  local reaction_count = 0
+  for line_num = start_line, end_line do
+    local line_text = vim.fn.getline(line_num)
+    -- Match "reaction(" at the start of a line (with optional whitespace)
+    if line_text:match("^%s*reaction%s*%(") then
+      if reaction_count == reaction_index then
+        -- Find the column where "reaction" starts
+        local col = line_text:find("reaction") - 1  -- Convert to 0-indexed
+        return {
+          range = {
+            start = { line = line_num - 1, character = col },  -- Convert back to 0-indexed for LSP format
+            ["end"] = { line = line_num - 1, character = col + 8 }
+          }
+        }
+      end
+      reaction_count = reaction_count + 1
+    end
+  end
+
+  return nil
+end
+
+-- Jump to a specific location in the current file
+---@param location table Location with range.start.line and range.start.character
+local function jump_to_location(location)
+  if location and location.range and location.range.start then
+    vim.schedule(function()
+      local target_line = location.range.start.line + 1
+      local target_char = location.range.start.character
+      vim.api.nvim_win_set_cursor(0, { target_line, target_char })
+      vim.cmd('normal! zz')
+    end)
+  end
+end
+
+-- Find the main reactor's range in source code
+-- The LSP doesn't return "main" as a symbol, so we search the source directly
+---@return table|nil range The range {start, end} of the main reactor, or nil if not found
+local function find_main_reactor_range()
+  local total_lines = vim.api.nvim_buf_line_count(0)
+  for line_num = 1, total_lines do
+    local line_text = vim.fn.getline(line_num)
+    if line_text:match("^%s*main%s+reactor") then
+      -- Found main reactor declaration, now find its closing brace
+      -- Count only standalone braces { }, ignoring code blocks {= =}
+      local start_line = line_num
+      local brace_count = 0
+      local found_open_brace = false
+      local end_line = total_lines  -- Default to end of file
+      for search_line = start_line, total_lines do
+        local search_text = vim.fn.getline(search_line)
+        -- Remove code block delimiters before counting
+        local clean_text = search_text:gsub("{=", "XX"):gsub("=}", "XX")
+        for _ in clean_text:gmatch("{") do
+          brace_count = brace_count + 1
+          found_open_brace = true
+        end
+        for _ in clean_text:gmatch("}") do brace_count = brace_count - 1 end
+        -- Only check for end after we've seen the opening brace
+        if found_open_brace and brace_count == 0 then
+          end_line = search_line
+          break
+        end
+      end
+      return {
+        start = { line = start_line - 1, character = 0 },
+        ["end"] = { line = end_line - 1, character = 0 }
+      }
+    end
+  end
+  return nil
+end
+
+-- Jump to port or reaction using LSP document symbols
+---@param parsed_result table Result from parse_element_id
+local function jump_to_port_or_reaction(parsed_result)
+  -- Get the LF LSP client
+  local lsp_clients = vim.lsp.get_clients and vim.lsp.get_clients() or vim.lsp.get_active_clients()
+  local client = nil
+  for _, c in ipairs(lsp_clients) do
+    if c.name == "lf-language-server" then
+      client = c
+      break
+    end
+  end
+
+  if not client then
+    vim.notify("LF LSP client not found for jump-to-source", vim.log.levels.ERROR)
+    return
+  end
+
+  -- Request document symbols
+  local params = { textDocument = vim.lsp.util.make_text_document_params() }
+  client.request('textDocument/documentSymbol', params, function(err, result)
+    if err or not result then
+      vim.schedule(function()
+        vim.notify("Failed to get document symbols: " .. (err and err.message or "no result"), vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    vim.schedule(function()
+      local symbol_path = parsed_result.symbol_path
+
+      -- Find the target reactor containing the port/reaction
+      local target_reactor = nil
+
+      if #symbol_path == 0 then
+        -- Port/reaction is on the main reactor
+        local main_range = find_main_reactor_range()
+        if main_range then
+          target_reactor = { range = main_range }
+        end
+      else
+        -- Navigate to the instance's reactor type
+        -- The instance is at the top level (direct child of main reactor)
+        local instance_name = symbol_path[#symbol_path]  -- Use the last instance in path
+
+        -- First, find the instance at the top level
+        local instance_symbol = nil
+        for _, symbol in ipairs(result) do
+          if symbol.name == instance_name then
+            instance_symbol = symbol
+            break
+          end
+        end
+
+        if not instance_symbol then
+          -- Instance not found at top level
+          vim.notify("Instance not found: " .. instance_name, vim.log.levels.WARN)
+          return
+        end
+
+        -- Get the reactor type from the instantiation line
+        local range = instance_symbol.location and instance_symbol.location.range or instance_symbol.range
+        if range and range.start then
+          local line = range.start.line + 1
+          local line_text = vim.fn.getline(line)
+          local type_name = extract_type_name_from_instantiation(line_text)
+
+          if type_name then
+            -- Find the reactor type definition
+            for _, symbol in ipairs(result) do
+              if symbol.name == type_name then
+                target_reactor = symbol
+                break
+              end
+            end
+          end
+        end
+      end
+
+      if not target_reactor then
+        vim.notify("Could not find reactor type", vim.log.levels.WARN)
+        return
+      end
+
+      -- Now find the port or reaction within the reactor
+      if parsed_result.element_type == "port" and parsed_result.port_index ~= nil then
+        -- Ports use numeric indices, search source directly
+        local location = find_port_in_source(target_reactor, parsed_result.port_index)
+        if location then
+          jump_to_location(location)
+        else
+          vim.notify("Port not found: index " .. parsed_result.port_index, vim.log.levels.WARN)
+        end
+      elseif parsed_result.element_type == "reaction" and parsed_result.reaction_index ~= nil then
+        -- Reactions are NOT in LSP document symbols, so search the source directly
+        local location = find_reaction_in_source(target_reactor, parsed_result.reaction_index)
+        if location then
+          jump_to_location(location)
+        else
+          vim.notify("Reaction not found: index " .. parsed_result.reaction_index, vim.log.levels.WARN)
+        end
+      end
+    end)
+  end, 0)
+end
+
 -- Handle element click from diagram (openInSource action)
 ---@param action table Action with kind='openInSource' and elementId
 function M.handle_element_click(action)
@@ -647,13 +941,22 @@ function M.handle_element_click(action)
     return
   end
 
-  -- Otherwise, try to resolve element ID to source location using LSP
-  local symbol_path = parse_element_id(element_id)
+  -- Parse element ID to get symbol path and element type
+  local parsed_result = parse_element_id(element_id)
 
-  if symbol_path then
-    -- Use LSP to find the symbol and jump to it
-    jump_to_symbol_lsp(symbol_path)
+  if not parsed_result then
+    return
   end
+
+  -- Handle different element types
+  if parsed_result.element_type == "port" or parsed_result.element_type == "reaction" then
+    -- Jump to port or reaction definition
+    jump_to_port_or_reaction(parsed_result)
+  elseif #parsed_result.symbol_path > 0 then
+    -- Jump to reactor instance (existing behavior)
+    jump_to_symbol_lsp(parsed_result.symbol_path)
+  end
+  -- If symbol_path is empty and not a port/reaction, it's the main reactor - do nothing
 end
 
 -- Stop all services
