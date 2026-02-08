@@ -1,22 +1,57 @@
 name: Build LF LSP Server
 
 on:
+  schedule:
+    - cron: "0 0 * * 1"  # Weekly on Monday
   workflow_dispatch:
     inputs:
       lf_version:
-        description: "Lingua Franca release tag (e.g. v0.11.0)"
-        required: true
+        description: "Lingua Franca release tag (e.g. v0.11.0). Leave empty to auto-detect latest."
+        required: false
         type: string
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      should_build: ${{ steps.resolve.outputs.should_build }}
+    steps:
+      - name: Resolve version to build
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.lf_version }}" ]; then
+            version="${{ inputs.lf_version }}"
+          else
+            # Get latest non-nightly release from lf-lang
+            version=$(gh api repos/lf-lang/lingua-franca/releases \
+              --jq '[.[] | select(.tag_name != "nightly" and .prerelease == false)][0].tag_name')
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Check if we already have this release
+          tag="lsp-${version}"
+          if gh release view "$tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release $tag already exists, skipping."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release $tag not found, will build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout lingua-franca at release tag
         uses: actions/checkout@v4
         with:
           repository: lf-lang/lingua-franca
-          ref: ${{ inputs.lf_version }}
+          ref: ${{ needs.check.outputs.version }}
           submodules: recursive
 
       - name: Set up Java 17
@@ -38,18 +73,24 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check.outputs.version }}
         run: |
-          tag="lsp-${{ inputs.lf_version }}"
+          tag="lsp-${VERSION}"
           gh release create "$tag" \
             --repo "${{ github.repository }}" \
-            --title "LSP Server (Lingua Franca ${{ inputs.lf_version }})" \
-            --notes "Pre-built LSP server jar from [lf-lang/lingua-franca ${{ inputs.lf_version }}](https://github.com/lf-lang/lingua-franca/releases/tag/${{ inputs.lf_version }}).
+            --title "LSP Server (Lingua Franca ${VERSION})" \
+            --notes "Pre-built LSP server jar from [lf-lang/lingua-franca ${VERSION}](https://github.com/lf-lang/lingua-franca/releases/tag/${VERSION}).
 
-          Built from source under the BSD 2-Clause License. See [LICENSE](https://github.com/lf-lang/lingua-franca/blob/${{ inputs.lf_version }}/LICENSE.md).
+          Built from source under the BSD 2-Clause License. See [LICENSE](https://github.com/lf-lang/lingua-franca/blob/${VERSION}/LICENSE.md).
 
           ## Usage
           Download the jar and point \`LF_LSP_JAR\` to it:
           \`\`\`bash
           export LF_LSP_JAR=/path/to/${{ steps.jar.outputs.name }}
+          \`\`\`
+
+          Or install directly in Neovim:
+          \`\`\`vim
+          :LFLspInstall
           \`\`\`" \
             "${{ steps.jar.outputs.path }}"
