@@ -137,6 +137,20 @@ function M.handle_rpc_message(data)
                     local action = action_msg.action
 
                     -- Handle openInSource action from diagram
+                    --
+                    -- TODO: Investigate switching to VSCode/KLighD server-side source resolution
+                    -- VSCode/KLighD approach:
+                    --   1. associateWith() links diagram elements to AST EObjects during synthesis
+                    --   2. Actions sent to LSP via diagram/accept
+                    --   3. KLighD resolves source location using MODEL_ELEMENT property + NodeModelUtils
+                    --   4. LSP sends diagram/openInTextEditor notification with URI + range
+                    -- Benefits: More accurate, handles all element types uniformly
+                    -- Blockers: Need to identify which action triggers KLighD's source resolution
+                    --           (PerformActionAction with specific actionId? Double-click?)
+                    --
+                    -- Current approach: Client-side resolution by parsing element IDs and
+                    -- using LSP documentSymbol to find source locations. Works but requires
+                    -- manual handling of each element type (ports, reactions, instances).
                     if action.kind == 'openInSource' then
                         vim.schedule(function()
                             local diagram_klighd = require('lf.diagram_klighd')
