@@ -15,63 +15,93 @@ CONTENTS                                                        *lf-contents*
 ==============================================================================
 1. INTRODUCTION                                             *lf-introduction*
 
-lf.nvim is a full-featured Neovim plugin for Lingua Franca, providing LSP
-integration, build management, and advanced IDE features.
+lf.nvim is a full-featured Neovim plugin for Lingua Franca, providing
+syntax highlighting, LSP integration, build management, and interactive
+diagram viewing.
 
 The plugin reuses the official Lingua Franca Language Server (Java-based)
 to provide feature parity with the VSCode extension.
 
 Features:
+  - Tree-sitter and fallback regex syntax highlighting
   - Full LSP support (diagnostics, hover, completion, etc.)
   - Custom build system integration
+  - Interactive KLighD diagram viewer in browser
   - Reactor library browser
   - AST viewer
-  - Diagram support (via lfd tool)
 
 ==============================================================================
 2. INSTALLATION                                             *lf-installation*
 
 Requirements:~
   - Neovim >= 0.10.0
-  - Java 17 or higher
-  - Lingua Franca LSP server (built from the LF repository)
+  - Java 17+ (for LSP features)
+  - curl (for :LFLspInstall)
 
-Building the LSP Server:~
->
-  cd /path/to/lingua-franca
+Using lazy.nvim:~
+>lua
+  {
+    "remifan/lf.nvim",
+    ft = "lf",
+    config = function()
+      require("lf").setup({
+        enable_lsp = true,
+      })
+    end,
+  }
+<
+
+LSP Server Setup:~
+
+The easiest way to install the LSP server jar:
+>vim
+  :LFLspInstall
+<
+
+This downloads a pre-built jar from GitHub releases. The plugin
+auto-detects it on next startup.
+
+Alternatively, build from source:
+>bash
+  git clone --recursive https://github.com/lf-lang/lingua-franca.git
+  cd lingua-franca
   ./gradlew :lsp:shadowJar
 <
 
 The JAR will be at: `lsp/build/libs/lsp-<version>-all.jar`
 
-Using lazy.nvim:~
->
-  {
-    dir = "/path/to/lingua-franca/nvim-plugin",
-    ft = "lf",
-    opts = {
-      lsp = {
-        jar_path = "/path/to/lsp-all.jar",
-      },
-    },
-  }
+JAR Discovery Priority:~
+
+  1. `LF_LSP_JAR` environment variable
+  2. Explicit `jar_path` in config
+  3. Auto-detection in common locations:
+     - `~/.local/share/nvim/lf-lsp/` (downloaded by :LFLspInstall)
+     - `~/lingua-franca/lsp/build/libs/`
+     - `./lsp/build/libs/` (current directory)
+     - `../lingua-franca/lsp/build/libs/` (parent directory)
+
+Tree-sitter Setup:~
+>vim
+  :LFTSInstall
 <
 
-Manual Installation:~
->
-  mkdir -p ~/.local/share/nvim/site/pack/plugins/start/
-  ln -s /path/to/lingua-franca/nvim-plugin \
-    ~/.local/share/nvim/site/pack/plugins/start/lf.nvim
-<
+Installs the LF tree-sitter parser and query files for modern syntax
+highlighting. Requires a C compiler (gcc or clang).
 
 ==============================================================================
 3. CONFIGURATION                                           *lf-configuration*
 
 Default configuration:~
->
+>lua
   require("lf").setup({
+    enable_lsp = true,
+    syntax = {
+      target_language = nil,       -- "C"|"Cpp"|"Python"|"Rust"|"TypeScript"
+      auto_detect_target = true,
+      indent = { size = 4, use_tabs = false },
+    },
     lsp = {
-      jar_path = nil,              -- Required
+      jar_path = nil,              -- Auto-detected if nil
       java_cmd = "java",
       java_args = {"-Xmx2G"},
       auto_start = true,
@@ -95,11 +125,33 @@ Default configuration:~
       library = "<leader>ll",
       diagram = "<leader>ld",
     },
+    diagram = {
+      no_browser = true,
+      auto_update = true,
+    },
   })
 <
 
 ==============================================================================
 4. COMMANDS                                                     *lf-commands*
+
+Install Commands:~
+
+:LFLspInstall                                                 *:LFLspInstall*
+  Download pre-built LSP server jar from GitHub releases.
+
+:LFLspStatus                                                   *:LFLspStatus*
+  Show LSP server installation status.
+
+:LFTSInstall                                                   *:LFTSInstall*
+  Install LF tree-sitter parser and queries. Use |:LFTSInstall!| to
+  force reinstall.
+
+:LFTSUninstall                                               *:LFTSUninstall*
+  Remove LF tree-sitter parser and queries.
+
+:LFTSStatus                                                     *:LFTSStatus*
+  Show tree-sitter installation status.
 
 Build Commands:~
 
@@ -130,11 +182,23 @@ Library Commands:~
 
 Diagram Commands:~
 
-:LFDiagram                                                         *:LFDiagram*
-  Generate and view diagram using external viewer (requires lfd).
+:LFDiagramOpen                                               *:LFDiagramOpen*
+  Open interactive KLighD diagram viewer in browser.
 
-:LFDiagramInfo                                                 *:LFDiagramInfo*
-  Show information about diagram support.
+:LFDiagram                                                         *:LFDiagram*
+  Alias for |:LFDiagramOpen|.
+
+:LFDiagramClose                                             *:LFDiagramClose*
+  Close diagram viewer and services.
+
+:LFDiagramToggle                                           *:LFDiagramToggle*
+  Toggle diagram viewer on/off.
+
+:LFDiagramBuild                                             *:LFDiagramBuild*
+  Build diagram dependencies (diagram-server and frontend).
+
+:LFDiagramExport                                           *:LFDiagramExport*
+  Generate and view static diagram.
 
 :LFExportDiagram [file] [format]                           *:LFExportDiagram*
   Export diagram to file (formats: svg, png, pdf).
@@ -175,7 +239,7 @@ lf.get_config()                                             *lf.get_config()*
 6. FEATURES                                                     *lf-features*
 
 LSP Features:~
-  - Syntax highlighting (via TreeSitter or fallback syntax file)
+  - Syntax highlighting (via tree-sitter or fallback syntax file)
   - Diagnostics (errors, warnings, info)
   - Go to definition (gd)
   - Go to references (gr)
@@ -186,9 +250,9 @@ LSP Features:~
 
 Custom Features:~
   - Build system integration with progress reporting
+  - Interactive KLighD diagram viewer with jump-to-source
   - Reactor library browser with telescope integration
   - AST viewer with S-expression format
-  - Diagram generation (via lfd tool)
   - Auto-validation on save
   - Quickfix integration for build errors
 
@@ -196,10 +260,10 @@ Custom Features:~
 7. TROUBLESHOOTING                                       *lf-troubleshooting*
 
 LSP Server Not Starting:~
-  1. Verify Java installation: `java -version` (requires Java 17+)
-  2. Check JAR path in configuration
-  3. Manually test: `java -jar /path/to/lsp-all.jar`
-  4. Check logs: `:LspLog` or `:messages`
+  1. Install jar:  :LFLspInstall  or  :LFLspStatus
+  2. Verify Java:  java -version  (requires Java 17+)
+  3. Check health:  :checkhealth lf
+  4. Check logs:  :LspLog  or  :messages
 
 Build Failures:~
   1. Ensure you're in a valid LF project
@@ -207,18 +271,20 @@ Build Failures:~
   3. Verify target configuration in .lf file
   4. Check LSP server logs
 
+Diagrams Not Opening:~
+  1. Ensure Node.js is installed: `node --version`
+  2. Try manual build: `:LFDiagramBuild`
+  3. Check sidecar logs in `:messages`
+
 Performance Issues:~
   1. Increase JVM heap: `java_args = {"-Xmx4G"}`
   2. Disable auto-validation: `build.auto_validate = false`
-  3. Use partial builds instead of full builds
 
 ==============================================================================
 8. CONTRIBUTING                                             *lf-contributing*
 
-This plugin is part of the Lingua Franca project.
-
-Repository: https://github.com/lf-lang/lingua-franca
-Issues: https://github.com/lf-lang/lingua-franca/issues
+Repository: https://github.com/remifan/lf.nvim
+Issues: https://github.com/remifan/lf.nvim/issues
 
 To contribute:
   1. Fork the repository

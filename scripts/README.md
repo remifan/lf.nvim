@@ -61,9 +61,11 @@ python3 scripts/update_syntax.py
 
 ## When to Use
 
-- When a new version of Lingua Franca is released
+These scripts are run automatically by the [sync-syntax CI workflow](../.github/workflows/sync-syntax.yml) on a weekly schedule. A PR is opened if keywords have changed.
+
+You can also run them manually:
 - When you notice missing keyword highlighting
-- Periodically to stay up-to-date with the VSCode extension
+- To preview upcoming changes before the CI runs
 
 ## Manual Update Process
 

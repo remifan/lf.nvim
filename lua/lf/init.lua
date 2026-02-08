@@ -134,7 +134,7 @@ local function validate_config(config)
         "  :LFLspInstall\n\n" ..
         "Or build from source:\n" ..
         "  cd /path/to/lingua-franca\n" ..
-        "  ./gradlew buildLsp",
+        "  ./gradlew :lsp:shadowJar",
         vim.log.levels.ERROR
       )
       return false

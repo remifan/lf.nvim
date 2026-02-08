@@ -23,11 +23,10 @@ function M.check()
     vim.health.ok("LSP JAR found: " .. config.lsp.jar_path)
   else
     vim.health.error("LSP JAR not found", {
-      "Build the LSP server:",
+      "Install pre-built jar:  :LFLspInstall",
+      "Or build from source:",
       "  cd /path/to/lingua-franca",
-      "  ./gradlew buildLsp",
-      "Then configure jar_path in your setup():",
-      "  jar_path = vim.fn.expand('~/path/to/lingua-franca/lsp/build/libs/lsp-*-all.jar')",
+      "  ./gradlew :lsp:shadowJar",
     })
   end
 
