@@ -246,6 +246,21 @@ function M.setup()
     desc = "Show LF tree-sitter installation status",
   })
 
+  -- LSP install commands
+  vim.api.nvim_create_user_command("LFLspInstall", function()
+    local lsp_install = require("lf.lsp_install")
+    lsp_install.install()
+  end, {
+    desc = "Download pre-built LSP server jar from GitHub releases",
+  })
+
+  vim.api.nvim_create_user_command("LFLspStatus", function()
+    local lsp_install = require("lf.lsp_install")
+    lsp_install.status()
+  end, {
+    desc = "Show LSP server installation status",
+  })
+
   -- Target position command
   vim.api.nvim_create_user_command("LFTargetPosition", function()
     local lsp = require("lf.lsp")

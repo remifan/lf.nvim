@@ -81,6 +81,8 @@ local function find_lsp_jar()
 
   -- Fall back to common paths
   local common_paths = {
+    -- Downloaded by :LFLspInstall
+    vim.fn.stdpath("data") .. "/lf-lsp/lsp-*-all.jar",
     -- User's home build
     vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar"),
     -- Current directory build
@@ -127,14 +129,12 @@ local function validate_config(config)
       -- Silently set JAR path, message available in :messages if needed
     else
       vim.notify(
-        "lf.nvim: LSP JAR not found. Please build and configure it.\n\n" ..
-        "Build LSP server:\n" ..
+        "lf.nvim: LSP JAR not found.\n\n" ..
+        "Install pre-built jar:\n" ..
+        "  :LFLspInstall\n\n" ..
+        "Or build from source:\n" ..
         "  cd /path/to/lingua-franca\n" ..
-        "  ./gradlew buildLsp\n\n" ..
-        "Then configure in your Neovim config:\n" ..
-        "  lsp = {\n" ..
-        "    jar_path = vim.fn.expand('~/path/to/lingua-franca/lsp/build/libs/lsp-*-all.jar')\n" ..
-        "  }",
+        "  ./gradlew buildLsp",
         vim.log.levels.ERROR
       )
       return false
