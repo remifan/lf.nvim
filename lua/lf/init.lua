@@ -82,11 +82,11 @@ local function find_lsp_jar()
   -- Fall back to common paths
   local common_paths = {
     -- User's home build
-    vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-SNAPSHOT-all.jar"),
+    vim.fn.expand("~/lingua-franca/lsp/build/libs/lsp-*-all.jar"),
     -- Current directory build
-    vim.fn.getcwd() .. "/lsp/build/libs/lsp-*-SNAPSHOT-all.jar",
+    vim.fn.getcwd() .. "/lsp/build/libs/lsp-*-all.jar",
     -- Parent directory build
-    vim.fn.fnamemodify(vim.fn.getcwd(), ":h") .. "/lingua-franca/lsp/build/libs/lsp-*-SNAPSHOT-all.jar",
+    vim.fn.fnamemodify(vim.fn.getcwd(), ":h") .. "/lingua-franca/lsp/build/libs/lsp-*-all.jar",
   }
 
   for _, path_pattern in ipairs(common_paths) do
