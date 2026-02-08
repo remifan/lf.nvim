@@ -1,10 +1,36 @@
-# Updating Syntax for New LF Releases
+# Updating for New LF Releases
 
-This guide explains how to keep the syntax highlighting up-to-date with new Lingua Franca releases.
+This guide explains how to keep lf.nvim up-to-date with new Lingua Franca releases.
 
-## Quick Start
+## LSP Server
 
-When a new version of Lingua Franca is released with new keywords:
+The LSP server jar is built from the Lingua Franca compiler. When a new version is released:
+
+### Automatic (CI)
+
+A [weekly CI workflow](.github/workflows/build-lsp.yml) checks for new lf-lang releases and builds the LSP jar automatically. No action needed — new jars appear as [GitHub releases](https://github.com/remifan/lf.nvim/releases).
+
+To trigger manually (e.g., for a fresh release):
+
+```bash
+# Auto-detect latest release
+gh workflow run build-lsp.yml -R remifan/lf.nvim
+
+# Or specify a version
+gh workflow run build-lsp.yml -R remifan/lf.nvim -f lf_version=v0.11.0
+```
+
+### For Users
+
+```vim
+:LFLspInstall
+```
+
+This downloads the latest pre-built jar. Run it again when a new version is available.
+
+## Syntax Highlighting
+
+The fallback regex syntax (`syntax/lf.vim`) is derived from the VSCode extension's TextMate grammar. When a new version is released with new keywords:
 
 ### Option A: From within Neovim (Easiest)
 
@@ -66,22 +92,14 @@ These are NOT modified by the update script:
 
 ## Checking for Updates
 
-### Option 1: Check Lingua Franca Releases
+### Automatic (CI)
 
-Visit [Lingua Franca Releases](https://github.com/lf-lang/lingua-franca/releases) and look for syntax changes in the changelog.
+A [weekly CI workflow](.github/workflows/sync-syntax.yml) checks the upstream VSCode extension grammar and opens a PR if keywords have changed. No action needed.
 
-### Option 2: Compare with VSCode Extension
-
-```bash
-# See current VSCode extension keywords
-curl -s https://raw.githubusercontent.com/lf-lang/vscode-lingua-franca/main/syntaxes/lflang.tmLanguage.json | \
-  grep -E '"match".*\\b\(' | head -20
-```
-
-### Option 3: Periodically Run Update Script
+### Manual
 
 ```bash
-# Set up a reminder to run every few months
+# Compare with upstream
 python3 scripts/update_syntax.py --dry-run
 ```
 
