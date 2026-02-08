@@ -12,8 +12,11 @@ jobs:
       - name: Checkout lf.nvim
         uses: actions/checkout@v4
 
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
       - name: Run syntax update script
-        run: lua scripts/update_syntax.lua
+        run: lua5.4 scripts/update_syntax.lua
 
       - name: Check for changes
         id: diff
