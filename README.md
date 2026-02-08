@@ -125,15 +125,6 @@ This installs the LF tree-sitter parser and query files. Requires:
 - `nvim-treesitter` plugin
 - C compiler (gcc or clang) if compiling from source
 
-**Tree-sitter Commands:**
-
-| Command | Description |
-|---------|-------------|
-| `:LFTSInstall` | Install LF tree-sitter parser and queries |
-| `:LFTSInstall!` | Force reinstall (with bang) |
-| `:LFTSUninstall` | Remove LF tree-sitter parser |
-| `:LFTSStatus` | Show tree-sitter installation status |
-
 **Incremental Selection** (with nvim-treesitter configured):
 - Press `<CR>` in normal mode to start selection
 - Press `<CR>` again to expand to next AST node
@@ -141,35 +132,35 @@ This installs the LF tree-sitter parser and query files. Requires:
 
 ## 🛠️ LSP Setup (Optional)
 
-LSP features require the Lingua Franca LSP server JAR.
+LSP features require the Lingua Franca LSP server JAR and Java 17+.
+
+### Download Pre-built JAR (Recommended)
+
+```vim
+:LFLspInstall
+```
+
+This downloads a pre-built JAR from the [lf.nvim releases](https://github.com/remifan/lf.nvim/releases) and stores it in `~/.local/share/nvim/lf-lsp/`. The plugin auto-detects it on next startup.
 
 ### Build from Source
 
 ```bash
-# Clone Lingua Franca repository
-git clone https://github.com/lf-lang/lingua-franca.git
+git clone --recursive https://github.com/lf-lang/lingua-franca.git
 cd lingua-franca
+./gradlew :lsp:shadowJar
 
-# Build LSP server
-./gradlew buildLsp
-
-# JAR location: lsp/build/libs/lsp-VERSION-SNAPSHOT-all.jar
+# JAR location: lsp/build/libs/lsp-VERSION-all.jar
 ```
 
 ### Configuration Methods
 
 The plugin finds the LSP JAR in this priority order:
 
-**1. Environment Variable (Recommended)**
-
-Set `LF_LSP_JAR` in your shell profile:
+**1. Environment Variable**
 
 ```bash
 # In ~/.bashrc, ~/.zshrc, or shell config
-export LF_LSP_JAR="$HOME/lingua-franca/lsp/build/libs/lsp-0.8.1-SNAPSHOT-all.jar"
-
-# Or with wildcard (auto-expands to latest)
-export LF_LSP_JAR="$HOME/lingua-franca/lsp/build/libs/lsp-*-all.jar"
+export LF_LSP_JAR="$HOME/.local/share/nvim/lf-lsp/lsp-*-all.jar"
 ```
 
 **2. Explicit Configuration**
@@ -183,6 +174,7 @@ lsp = {
 **3. Auto-Detection**
 
 If neither above is set, searches common locations:
+- `~/.local/share/nvim/lf-lsp/lsp-*-all.jar` (downloaded by `:LFLspInstall`)
 - `~/lingua-franca/lsp/build/libs/lsp-*-all.jar`
 - `./lsp/build/libs/lsp-*-all.jar` (current directory)
 - `../lingua-franca/lsp/build/libs/lsp-*-all.jar` (parent directory)
@@ -221,6 +213,17 @@ Available when LSP is enabled (Mac/Linux):
 | `:LFDiagramBuild` | Manually build diagram dependencies |
 | `:LFDiagramExport` | Generate and view static diagram |
 | `:LFExportDiagram [file] [format]` | Export diagram to file (svg, png, pdf) |
+
+### Install Commands
+
+| Command | Description |
+|---------|-------------|
+| `:LFLspInstall` | Download pre-built LSP server jar from GitHub releases |
+| `:LFLspStatus` | Show LSP server installation status |
+| `:LFTSInstall` | Install LF tree-sitter parser and queries |
+| `:LFTSInstall!` | Force reinstall (with bang) |
+| `:LFTSUninstall` | Remove LF tree-sitter parser |
+| `:LFTSStatus` | Show tree-sitter installation status |
 
 ### Other Commands
 
@@ -385,9 +388,10 @@ cd diagram-server && npm install
 ### LSP Server Not Starting
 
 1. Verify Java is installed: `java -version` (requires Java 17+)
-2. Check JAR path: `:checkhealth lf`
-3. Manually test server: `java -jar /path/to/lsp-*-all.jar`
-4. Check Neovim LSP logs: `:LspLog`
+2. Install or check JAR: `:LFLspInstall` or `:LFLspStatus`
+3. Check health: `:checkhealth lf`
+4. Manually test server: `java -jar /path/to/lsp-*-all.jar`
+5. Check Neovim LSP logs: `:LspLog`
 
 ### Diagrams Not Opening
 
