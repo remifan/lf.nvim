@@ -1,12 +1,12 @@
 -- LSP jar installer for lf.nvim
--- Downloads pre-built LSP server jar from GitHub releases
+-- Downloads pre-built LSP server jar from GitHub artifacts release
 
 local M = {}
 
 local uv = vim.loop
 
-local GITHUB_REPO = "remifan/lf.nvim"
-local RELEASES_URL = "https://github.com/" .. GITHUB_REPO .. "/releases"
+local ARTIFACTS_API = "https://api.github.com/repos/remifan/lf.nvim/releases/tags/artifacts"
+local ARTIFACTS_URL = "https://github.com/remifan/lf.nvim/releases/download/artifacts"
 
 -- Where to store the downloaded jar
 local function get_install_dir()
@@ -15,105 +15,79 @@ local function get_install_dir()
   return dir
 end
 
--- List available versions from GitHub releases via gh CLI
+--- Spawn a command asynchronously, call back with exit code and stdout
+local function spawn_collect(cmd, args, callback)
+  local stdout_chunks = {}
+  local stdout = uv.new_pipe(false)
+  local stderr = uv.new_pipe(false)
+  local handle
+
+  handle = uv.spawn(cmd, {
+    args = args,
+    stdio = { nil, stdout, stderr },
+  }, function(code)
+    stdout:close()
+    stderr:close()
+    handle:close()
+    vim.schedule(function()
+      callback(code, table.concat(stdout_chunks))
+    end)
+  end)
+
+  if not handle then
+    return false
+  end
+
+  stdout:read_start(function(_, data)
+    if data then table.insert(stdout_chunks, data) end
+  end)
+  stderr:read_start(function() end)
+  return true
+end
+
+-- Fetch available jar names from the artifacts release
 local function fetch_versions(callback)
-  local cmd = { "gh", "api", "repos/" .. GITHUB_REPO .. "/releases",
-    "--jq", '.[] | select(.tag_name | startswith("lsp-")) | .tag_name | ltrimstr("lsp-")' }
-
-  local stdout_chunks = {}
-  local stderr_chunks = {}
-  local handle
-  local stdout = uv.new_pipe(false)
-  local stderr = uv.new_pipe(false)
-
-  handle = uv.spawn(cmd[1], {
-    args = vim.list_slice(cmd, 2),
-    stdio = { nil, stdout, stderr },
-  }, function(code)
-    stdout:close()
-    stderr:close()
-    handle:close()
-    vim.schedule(function()
-      if code ~= 0 then
-        -- Fall back to curl if gh is not available
-        fetch_versions_curl(callback)
-        return
-      end
-      local output = table.concat(stdout_chunks)
-      local versions = {}
-      for v in output:gmatch("[^\n]+") do
-        table.insert(versions, v)
-      end
-      callback(versions, nil)
-    end)
-  end)
-
-  if not handle then
-    vim.schedule(function() fetch_versions_curl(callback) end)
+  if vim.fn.executable("curl") == 0 then
+    callback(nil, "curl not found")
     return
   end
 
-  stdout:read_start(function(_, data)
-    if data then table.insert(stdout_chunks, data) end
-  end)
-  stderr:read_start(function(_, data)
-    if data then table.insert(stderr_chunks, data) end
-  end)
-end
+  local ok = spawn_collect("curl", { "-fsSL", ARTIFACTS_API }, function(code, output)
+    if code ~= 0 then
+      callback(nil, "Failed to fetch release info from GitHub")
+      return
+    end
 
--- Fallback: list versions via curl
-local function fetch_versions_curl(callback)
-  local url = "https://api.github.com/repos/" .. GITHUB_REPO .. "/releases"
-  local cmd = { "curl", "-fsSL", url }
+    local parse_ok, release = pcall(vim.json.decode, output)
+    if not parse_ok or type(release) ~= "table" then
+      callback(nil, "Failed to parse release JSON")
+      return
+    end
 
-  local stdout_chunks = {}
-  local handle
-  local stdout = uv.new_pipe(false)
-  local stderr = uv.new_pipe(false)
+    local jars = {}
+    for _, asset in ipairs(release.assets or {}) do
+      local name = asset.name or ""
+      if name:match("^lsp%-.*%-all%.jar$") then
+        table.insert(jars, name)
+      end
+    end
 
-  handle = uv.spawn(cmd[1], {
-    args = vim.list_slice(cmd, 2),
-    stdio = { nil, stdout, stderr },
-  }, function(code)
-    stdout:close()
-    stderr:close()
-    handle:close()
-    vim.schedule(function()
-      if code ~= 0 then
-        callback(nil, "Failed to fetch releases")
-        return
-      end
-      local output = table.concat(stdout_chunks)
-      local ok, releases = pcall(vim.json.decode, output)
-      if not ok then
-        callback(nil, "Failed to parse releases JSON")
-        return
-      end
-      local versions = {}
-      for _, rel in ipairs(releases) do
-        local tag = rel.tag_name or ""
-        if tag:match("^lsp%-") then
-          table.insert(versions, tag:gsub("^lsp%-", ""))
-        end
-      end
-      callback(versions, nil)
-    end)
+    if #jars == 0 then
+      callback(nil, "No LSP jars found in artifacts release")
+    else
+      table.sort(jars)
+      callback(jars, nil)
+    end
   end)
 
-  if not handle then
+  if not ok then
     callback(nil, "Failed to spawn curl")
-    return
   end
-
-  stdout:read_start(function(_, data)
-    if data then table.insert(stdout_chunks, data) end
-  end)
 end
 
--- Download the jar for a given version (e.g. "v0.11.0")
-local function download_jar(version, callback)
-  local jar_name = "lsp-" .. version:gsub("^v", "") .. "-all.jar"
-  local url = RELEASES_URL .. "/download/lsp-" .. version .. "/" .. jar_name
+-- Download a jar by name
+local function download_jar(jar_name, callback)
+  local url = ARTIFACTS_URL .. "/" .. jar_name
   local dest = get_install_dir() .. "/" .. jar_name
 
   -- Check if already downloaded
@@ -124,37 +98,18 @@ local function download_jar(version, callback)
 
   vim.notify("[lf.nvim] Downloading " .. jar_name .. "...", vim.log.levels.INFO)
 
-  local stderr_chunks = {}
-  local handle
-  local stdout = uv.new_pipe(false)
-  local stderr = uv.new_pipe(false)
-
-  handle = uv.spawn("curl", {
-    args = { "-fSL", "--progress-bar", "-o", dest, url },
-    stdio = { nil, stdout, stderr },
-  }, function(code)
-    stdout:close()
-    stderr:close()
-    handle:close()
-    vim.schedule(function()
-      if code ~= 0 then
-        vim.fn.delete(dest)
-        callback(nil, "Download failed: " .. table.concat(stderr_chunks))
-      else
-        callback(dest, nil)
-      end
-    end)
+  local ok = spawn_collect("curl", { "-fSL", "-o", dest, url }, function(code)
+    if code == 0 then
+      callback(dest, nil)
+    else
+      vim.fn.delete(dest)
+      callback(nil, "Download failed (HTTP error)")
+    end
   end)
 
-  if not handle then
+  if not ok then
     callback(nil, "Failed to spawn curl")
-    return
   end
-
-  stdout:read_start(function() end)
-  stderr:read_start(function(_, data)
-    if data then table.insert(stderr_chunks, data) end
-  end)
 end
 
 -- Find currently installed jar
@@ -163,12 +118,12 @@ function M.get_installed_jar()
   local jars = vim.fn.glob(dir .. "/lsp-*-all.jar", false, true)
   if #jars > 0 then
     table.sort(jars)
-    return jars[#jars] -- latest by name
+    return jars[#jars]
   end
   return nil
 end
 
--- Install: fetch versions, let user pick, download
+-- Install: fetch available jars, let user pick, download
 function M.install(opts)
   opts = opts or {}
 
@@ -179,15 +134,15 @@ function M.install(opts)
 
   vim.notify("[lf.nvim] Fetching available LSP versions...", vim.log.levels.INFO)
 
-  fetch_versions(function(versions, err)
-    if err or not versions or #versions == 0 then
+  fetch_versions(function(jars, err)
+    if err or not jars or #jars == 0 then
       vim.notify("[lf.nvim] No LSP releases found. " .. (err or ""), vim.log.levels.ERROR)
       return
     end
 
     -- If only one version, use it directly
-    if #versions == 1 then
-      download_jar(versions[1], function(path, dl_err)
+    if #jars == 1 then
+      download_jar(jars[1], function(path, dl_err)
         if dl_err then
           vim.notify("[lf.nvim] " .. dl_err, vim.log.levels.ERROR)
         else
@@ -198,7 +153,7 @@ function M.install(opts)
     end
 
     -- Let user pick
-    vim.ui.select(versions, { prompt = "Select LF LSP version:" }, function(choice)
+    vim.ui.select(jars, { prompt = "Select LF LSP jar:" }, function(choice)
       if not choice then return end
       download_jar(choice, function(path, dl_err)
         if dl_err then

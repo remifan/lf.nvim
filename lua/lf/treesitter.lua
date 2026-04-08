@@ -15,9 +15,7 @@ M.config = {
 
 local uv = vim.loop
 
-local GITHUB_REPO = "remifan/lf.nvim"
-local RELEASES_API = "https://api.github.com/repos/" .. GITHUB_REPO .. "/releases"
-local RELEASES_URL = "https://github.com/" .. GITHUB_REPO .. "/releases"
+local ARTIFACTS_URL = "https://github.com/remifan/lf.nvim/releases/download/artifacts"
 
 -- Detect platform: returns artifact name like "lf-linux-x64.so" and parser lib extension
 local function get_platform_info()
@@ -175,22 +173,7 @@ function M.queries_installed()
   return vim.fn.filereadable(highlights_path) == 1
 end
 
--- Parse GitHub releases JSON to find the latest ts-* tag
-local function parse_ts_tag(json_str)
-  local ok, releases = pcall(vim.json.decode, json_str)
-  if not ok or type(releases) ~= "table" then
-    return nil
-  end
-  for _, rel in ipairs(releases) do
-    local tag = rel.tag_name or ""
-    if tag:match("^ts%-") then
-      return tag
-    end
-  end
-  return nil
-end
-
---- Spawn a command asynchronously, collect stdout, call back with (code, stdout_str)
+--- Spawn a command asynchronously, call back with exit code and stdout
 ---@param cmd string
 ---@param args string[]
 ---@param callback fun(code: number, stdout: string)
@@ -223,32 +206,6 @@ local function spawn_collect(cmd, args, callback)
   return true
 end
 
---- Fetch the latest treesitter release tag from GitHub (curl only, no gh required)
----@param callback fun(tag: string|nil, err: string|nil)
-local function fetch_latest_ts_tag(callback)
-  if vim.fn.executable("curl") == 0 then
-    callback(nil, "curl not found")
-    return
-  end
-
-  local ok = spawn_collect("curl", { "-fsSL", RELEASES_API }, function(code, output)
-    if code ~= 0 then
-      callback(nil, "Failed to fetch releases from GitHub")
-      return
-    end
-    local tag = parse_ts_tag(output)
-    if tag then
-      callback(tag, nil)
-    else
-      callback(nil, "No tree-sitter release found")
-    end
-  end)
-
-  if not ok then
-    callback(nil, "Failed to spawn curl")
-  end
-end
-
 --- Download a file via curl
 ---@param url string
 ---@param dest string
@@ -273,7 +230,7 @@ local function download_file(url, dest, callback)
   end
 end
 
---- Download parser binary and queries from GitHub, then install
+--- Download parser binary and queries from GitHub artifacts release
 ---@param callback fun(ok: boolean, err: string|nil)
 local function install_from_github(callback)
   local artifact = get_platform_info()
@@ -282,67 +239,57 @@ local function install_from_github(callback)
     return
   end
 
-  vim.notify("[lf.nvim] Fetching latest tree-sitter release...", vim.log.levels.INFO)
+  local lib_name = parser_lib_name()
+  local parser_dir = get_parser_install_dir()
+  local parser_output = parser_dir .. "/" .. lib_name
+  vim.fn.mkdir(parser_dir, "p")
 
-  fetch_latest_ts_tag(function(tag, err)
-    if not tag then
-      callback(false, err or "No release found")
+  local parser_url = ARTIFACTS_URL .. "/" .. artifact
+  local queries_url = ARTIFACTS_URL .. "/queries.tar.gz"
+
+  local tmp_dir = vim.fn.tempname()
+  vim.fn.mkdir(tmp_dir, "p")
+  local tmp_parser = tmp_dir .. "/" .. lib_name
+  local tmp_queries = tmp_dir .. "/queries.tar.gz"
+
+  vim.notify("[lf.nvim] Downloading tree-sitter parser...", vim.log.levels.INFO)
+
+  download_file(parser_url, tmp_parser, function(p_ok, p_err)
+    if not p_ok then
+      vim.fn.delete(tmp_dir, "rf")
+      callback(false, "Parser download failed: " .. (p_err or ""))
       return
     end
 
-    local lib_name = parser_lib_name()
-    local parser_dir = get_parser_install_dir()
-    local parser_output = parser_dir .. "/" .. lib_name
-    vim.fn.mkdir(parser_dir, "p")
-
-    local parser_url = RELEASES_URL .. "/download/" .. tag .. "/" .. artifact
-    local queries_url = RELEASES_URL .. "/download/" .. tag .. "/queries.tar.gz"
-
-    -- Use a temp dir for downloads
-    local tmp_dir = vim.fn.tempname()
-    vim.fn.mkdir(tmp_dir, "p")
-    local tmp_parser = tmp_dir .. "/" .. lib_name
-    local tmp_queries = tmp_dir .. "/queries.tar.gz"
-
-    vim.notify("[lf.nvim] Downloading parser (" .. tag .. ")...", vim.log.levels.INFO)
-
-    download_file(parser_url, tmp_parser, function(p_ok, p_err)
-      if not p_ok then
+    download_file(queries_url, tmp_queries, function(q_ok, q_err)
+      if not q_ok then
         vim.fn.delete(tmp_dir, "rf")
-        callback(false, "Parser download failed: " .. (p_err or ""))
+        callback(false, "Queries download failed: " .. (q_err or ""))
         return
       end
 
-      download_file(queries_url, tmp_queries, function(q_ok, q_err)
-        if not q_ok then
-          vim.fn.delete(tmp_dir, "rf")
-          callback(false, "Queries download failed: " .. (q_err or ""))
-          return
-        end
-
-        -- Install parser binary
-        local content = vim.fn.readblob(tmp_parser)
-        if vim.fn.writefile(content, parser_output, "b") ~= 0 then
-          vim.fn.delete(tmp_dir, "rf")
-          callback(false, "Failed to write parser to " .. parser_output)
-          return
-        end
-        vim.fn.setfperm(parser_output, "rwxr-xr-x")
-
-        -- Extract queries
-        local queries_dst = get_queries_dir() .. "/lf"
-        vim.fn.mkdir(queries_dst, "p")
-        local tar_ret = os.execute("tar xzf " .. vim.fn.shellescape(tmp_queries) .. " -C " .. vim.fn.shellescape(queries_dst))
-
+      -- Install parser binary
+      local content = vim.fn.readblob(tmp_parser)
+      if vim.fn.writefile(content, parser_output, "b") ~= 0 then
         vim.fn.delete(tmp_dir, "rf")
+        callback(false, "Failed to write parser to " .. parser_output)
+        return
+      end
+      vim.fn.setfperm(parser_output, "rwxr-xr-x")
 
-        if tar_ret ~= 0 then
-          callback(false, "Failed to extract queries")
-          return
-        end
+      -- Extract queries
+      local queries_dst = get_queries_dir() .. "/lf"
+      vim.fn.mkdir(queries_dst, "p")
+      local tar_ret = os.execute("tar xzf " .. vim.fn.shellescape(tmp_queries) .. " -C " .. vim.fn.shellescape(queries_dst))
 
-        callback(true, nil)
-      end)
+      vim.fn.delete(tmp_dir, "rf")
+
+      if tar_ret ~= 0 then
+        callback(false, "Failed to extract queries")
+        return
+      end
+
+      callback(true, nil)
     end)
   end)
 end

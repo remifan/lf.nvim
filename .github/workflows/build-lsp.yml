@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.resolve.outputs.version }}
+      jar_name: ${{ steps.resolve.outputs.jar_name }}
       should_build: ${{ steps.resolve.outputs.should_build }}
     steps:
       - name: Resolve version to build
@@ -25,20 +26,22 @@ jobs:
           if [ -n "${{ inputs.lf_version }}" ]; then
             version="${{ inputs.lf_version }}"
           else
-            # Get latest non-nightly release from lf-lang
             version=$(gh api repos/lf-lang/lingua-franca/releases \
               --jq '[.[] | select(.tag_name != "nightly" and .prerelease == false)][0].tag_name')
           fi
 
+          jar_name="lsp-${version#v}-all.jar"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "jar_name=$jar_name" >> "$GITHUB_OUTPUT"
 
-          # Check if we already have this release
-          tag="lsp-${version}"
-          if gh release view "$tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            echo "Release $tag already exists, skipping."
+          # Check if this jar already exists in the artifacts release
+          existing=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
+            --jq ".assets[].name" 2>/dev/null || true)
+          if echo "$existing" | grep -qF "$jar_name"; then
+            echo "Asset $jar_name already exists, skipping."
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Release $tag not found, will build."
+            echo "Asset $jar_name not found, will build."
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -63,34 +66,27 @@ jobs:
       - name: Build LSP shadow jar
         run: ./gradlew :lsp:shadowJar
 
-      - name: Identify built jar
-        id: jar
-        run: |
-          jar=$(ls lsp/build/libs/lsp-*-all.jar)
-          echo "path=$jar" >> "$GITHUB_OUTPUT"
-          echo "name=$(basename "$jar")" >> "$GITHUB_OUTPUT"
+      - name: Rename jar
+        run: cp lsp/build/libs/lsp-*-all.jar "${{ needs.check.outputs.jar_name }}"
 
-      - name: Create release
+      - name: Ensure artifacts release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.check.outputs.version }}
         run: |
-          tag="lsp-${VERSION}"
-          gh release create "$tag" \
-            --repo "${{ github.repository }}" \
-            --title "LSP Server (Lingua Franca ${VERSION})" \
-            --notes "Pre-built LSP server jar from [lf-lang/lingua-franca ${VERSION}](https://github.com/lf-lang/lingua-franca/releases/tag/${VERSION}).
+          gh release view artifacts --repo "${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create artifacts --repo "${{ github.repository }}" \
+            --title "Pre-built artifacts" \
+            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
 
-          Built from source under the BSD 2-Clause License. See [LICENSE](https://github.com/lf-lang/lingua-franca/blob/${VERSION}/LICENSE.md).
-
-          ## Usage
-          Download the jar and point \`LF_LSP_JAR\` to it:
-          \`\`\`bash
-          export LF_LSP_JAR=/path/to/${{ steps.jar.outputs.name }}
-          \`\`\`
-
-          Or install directly in Neovim:
+          Install in Neovim:
           \`\`\`vim
           :LFLspInstall
-          \`\`\`" \
-            "${{ steps.jar.outputs.path }}"
+          :LFTSInstall
+          \`\`\`"
+
+      - name: Upload jar to artifacts release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload artifacts "${{ needs.check.outputs.jar_name }}" \
+            --repo "${{ github.repository }}" --clobber

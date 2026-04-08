@@ -25,20 +25,30 @@ jobs:
           if [ -n "${{ inputs.ts_version }}" ]; then
             version="${{ inputs.ts_version }}"
           else
-            # Get latest release from tree-sitter-lf
             version=$(gh api repos/remifan/tree-sitter-lf/releases \
               --jq '[.[] | select(.prerelease == false)][0].tag_name')
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-          # Check if we already have this release
-          tag="ts-${version}"
-          if gh release view "$tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            echo "Release $tag already exists, skipping."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          # Check if this version's parsers already exist by reading ts-version.txt
+          current=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
+            --jq '.assets[] | select(.name == "ts-version.txt") | .name' 2>/dev/null || true)
+
+          if [ -n "$current" ]; then
+            # Download and compare
+            gh release download artifacts --repo "${{ github.repository }}" \
+              --pattern "ts-version.txt" --dir /tmp --clobber 2>/dev/null || true
+            existing=$(cat /tmp/ts-version.txt 2>/dev/null || true)
+            if [ "$existing" = "$version" ]; then
+              echo "Tree-sitter $version already built, skipping."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Tree-sitter version changed ($existing -> $version), will build."
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "Release $tag not found, will build."
+            echo "No existing tree-sitter build, will build."
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -101,26 +111,34 @@ jobs:
       - name: Package queries
         run: tar czf queries.tar.gz -C queries .
 
-      - name: Download all artifacts
+      - name: Write version marker
+        run: echo "${{ needs.check.outputs.version }}" > ts-version.txt
+
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Create release
+      - name: Ensure artifacts release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.check.outputs.version }}
         run: |
-          tag="ts-${VERSION}"
-          gh release create "$tag" \
-            --repo "${{ github.repository }}" \
-            --title "Tree-sitter Parser (tree-sitter-lf ${VERSION})" \
-            --notes "Pre-built tree-sitter LF parser from [remifan/tree-sitter-lf ${VERSION}](https://github.com/remifan/tree-sitter-lf/releases/tag/${VERSION}).
+          gh release view artifacts --repo "${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create artifacts --repo "${{ github.repository }}" \
+            --title "Pre-built artifacts" \
+            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
 
-          ## Usage
-          Install directly in Neovim:
+          Install in Neovim:
           \`\`\`vim
+          :LFLspInstall
           :LFTSInstall
-          \`\`\`" \
-            artifacts/* queries.tar.gz
+          \`\`\`"
+
+      - name: Upload to artifacts release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload artifacts \
+            artifacts/* queries.tar.gz ts-version.txt \
+            --repo "${{ github.repository }}" --clobber
