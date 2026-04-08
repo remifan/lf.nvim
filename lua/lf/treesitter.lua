@@ -190,92 +190,66 @@ local function parse_ts_tag(json_str)
   return nil
 end
 
--- Fetch latest ts tag via curl (fallback)
-local function fetch_latest_ts_tag_curl(callback)
-  if vim.fn.executable("curl") == 0 then
-    callback(nil, "Neither gh nor curl found")
-    return
-  end
-
+--- Spawn a command asynchronously, collect stdout, call back with (code, stdout_str)
+---@param cmd string
+---@param args string[]
+---@param callback fun(code: number, stdout: string)
+local function spawn_collect(cmd, args, callback)
   local stdout_chunks = {}
   local stdout = uv.new_pipe(false)
   local stderr = uv.new_pipe(false)
   local handle
 
-  handle = uv.spawn("curl", {
-    args = { "-fsSL", RELEASES_API },
+  handle = uv.spawn(cmd, {
+    args = args,
     stdio = { nil, stdout, stderr },
   }, function(code)
     stdout:close()
     stderr:close()
     handle:close()
     vim.schedule(function()
-      if code ~= 0 then
-        callback(nil, "Failed to fetch releases from GitHub")
-        return
-      end
-      local tag = parse_ts_tag(table.concat(stdout_chunks))
-      if tag then
-        callback(tag, nil)
-      else
-        callback(nil, "No tree-sitter release found")
-      end
+      callback(code, table.concat(stdout_chunks))
     end)
   end)
 
   if not handle then
-    callback(nil, "Failed to spawn curl")
-    return
+    return false
   end
 
   stdout:read_start(function(_, data)
     if data then table.insert(stdout_chunks, data) end
   end)
   stderr:read_start(function() end)
+  return true
 end
 
---- Fetch the latest treesitter release tag from GitHub
+--- Fetch the latest treesitter release tag from GitHub (curl only, no gh required)
 ---@param callback fun(tag: string|nil, err: string|nil)
 local function fetch_latest_ts_tag(callback)
-  -- Try gh first
-  if vim.fn.executable("gh") == 1 then
-    local stdout_chunks = {}
-    local stdout = uv.new_pipe(false)
-    local stderr = uv.new_pipe(false)
-    local handle
-    handle = uv.spawn("gh", {
-      args = { "api", "repos/" .. GITHUB_REPO .. "/releases",
-        "--jq", '[.[] | select(.tag_name | startswith("ts-"))][0].tag_name' },
-      stdio = { nil, stdout, stderr },
-    }, function(code)
-      stdout:close()
-      stderr:close()
-      handle:close()
-      vim.schedule(function()
-        if code == 0 then
-          local tag = vim.trim(table.concat(stdout_chunks))
-          if tag ~= "" and tag ~= "null" then
-            callback(tag, nil)
-            return
-          end
-        end
-        fetch_latest_ts_tag_curl(callback)
-      end)
-    end)
-
-    if handle then
-      stdout:read_start(function(_, data)
-        if data then table.insert(stdout_chunks, data) end
-      end)
-      stderr:read_start(function() end)
-      return
-    end
+  if vim.fn.executable("curl") == 0 then
+    callback(nil, "curl not found")
+    return
   end
 
-  fetch_latest_ts_tag_curl(callback)
+  local ok = spawn_collect("curl", { "-fsSL", RELEASES_API }, function(code, output)
+    if code ~= 0 then
+      callback(nil, "Failed to fetch releases from GitHub")
+      return
+    end
+    local tag = parse_ts_tag(output)
+    if tag then
+      callback(tag, nil)
+    else
+      callback(nil, "No tree-sitter release found")
+    end
+  end)
+
+  if not ok then
+    callback(nil, "Failed to spawn curl")
+  end
 end
 
---- Download a file from GitHub release via curl
+--- Download a file via curl
 ---@param url string
 ---@param dest string
 ---@param callback fun(ok: boolean, err: string|nil)
@@ -285,37 +259,18 @@ local function download_file(url, dest, callback)
     return
   end
 
-  local stderr_chunks = {}
-  local stdout = uv.new_pipe(false)
-  local stderr = uv.new_pipe(false)
-  local handle
-
-  handle = uv.spawn("curl", {
-    args = { "-fSL", "--progress-bar", "-o", dest, url },
-    stdio = { nil, stdout, stderr },
-  }, function(code)
-    stdout:close()
-    stderr:close()
-    handle:close()
-    vim.schedule(function()
-      if code == 0 then
-        callback(true, nil)
-      else
-        vim.fn.delete(dest)
-        callback(false, "Download failed: " .. table.concat(stderr_chunks))
-      end
-    end)
+  local ok = spawn_collect("curl", { "-fSL", "-o", dest, url }, function(code)
+    if code == 0 then
+      callback(true, nil)
+    else
+      vim.fn.delete(dest)
+      callback(false, "Download failed (HTTP error)")
+    end
   end)
 
-  if not handle then
+  if not ok then
     callback(false, "Failed to spawn curl")
-    return
   end
-
-  stdout:read_start(function() end)
-  stderr:read_start(function(_, data)
-    if data then table.insert(stderr_chunks, data) end
-  end)
 end
 
 --- Download parser binary and queries from GitHub, then install
