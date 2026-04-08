@@ -299,33 +299,6 @@ require("lf").setup({
 })
 ```
 
-## 🎨 Syntax Highlighting Details
-
-### Lingua Franca Keywords
-- **Core**: `reactor`, `input`, `output`, `action`, `state`, `timer`, `reaction`, `method`, `preamble`
-- **Modifiers**: `main`, `federated`, `realtime`, `mutable`, `const`, `logical`, `physical`
-- **Modes**: `mode`, `initial`, `reset`, `history`
-- **Other**: `after`, `deadline`, `new`, `at`, `widthof`, `startup`, `shutdown`
-
-### Literals & Operators
-- **Time values**: `100 msec`, `1 sec`, `forever`, `never`
-- **Time units**: `nsec`, `usec`, `msec`, `sec`, `min`, `hour`, `day`, `week` (and abbreviations like `ns`, `us`, `ms`, `s`, `m`, `h`, `d`)
-- **Numbers**: Integers, floats
-- **Strings**: Double-quoted strings, char literals
-- **Operators**: `->` (connections), `~>` (physical connections)
-- **Booleans**: `true`, `false`
-
-### Embedded Languages
-
-Code within `{= =}` delimiters gets full syntax highlighting:
-- **C/C++**: Functions, keywords, types, preprocessor directives
-- **Python**: Keywords, builtins, decorators, string formatting
-- **TypeScript**: Types, interfaces, async/await, JSX
-- **Rust**: Ownership keywords, macros, lifetimes
-
-### Comments
-- Line comments: `//`
-- Block comments: `/* */`
 
 ## 📖 Documentation
 
