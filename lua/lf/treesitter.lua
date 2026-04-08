@@ -19,18 +19,23 @@ local GITHUB_REPO = "remifan/lf.nvim"
 local RELEASES_API = "https://api.github.com/repos/" .. GITHUB_REPO .. "/releases"
 local RELEASES_URL = "https://github.com/" .. GITHUB_REPO .. "/releases"
 
--- Detect platform: returns artifact name like "lf-linux-x64.so"
-local function get_artifact_name()
+-- Detect platform: returns artifact name like "lf-linux-x64.so" and parser lib extension
+local function get_platform_info()
   local os_name = vim.loop.os_uname().sysname:lower()
   local arch = vim.loop.os_uname().machine
 
-  local platform
+  local platform, ext
   if os_name == "linux" then
     platform = "linux"
+    ext = "so"
   elseif os_name == "darwin" then
     platform = "darwin"
+    ext = "so"
+  elseif os_name:match("windows") or os_name:match("mingw") then
+    platform = "win"
+    ext = "dll"
   else
-    return nil
+    return nil, nil, nil
   end
 
   local cpu
@@ -39,10 +44,16 @@ local function get_artifact_name()
   elseif arch == "aarch64" or arch == "arm64" then
     cpu = "arm64"
   else
-    return nil
+    return nil, nil, nil
   end
 
-  return "lf-" .. platform .. "-" .. cpu .. ".so"
+  return "lf-" .. platform .. "-" .. cpu .. "." .. ext, ext, platform
+end
+
+-- Parser library filename for the current platform (lf.so or lf.dll)
+local function parser_lib_name()
+  local _, ext = get_platform_info()
+  return "lf." .. (ext or "so")
 end
 
 -- Get nvim-treesitter parser installation directory
@@ -153,7 +164,7 @@ end
 -- Check if parser is already installed
 function M.is_installed()
   local parser_dir = get_parser_install_dir()
-  local parser_path = parser_dir .. "/lf.so"
+  local parser_path = parser_dir .. "/" .. parser_lib_name()
   return vim.fn.filereadable(parser_path) == 1
 end
 
@@ -310,7 +321,7 @@ end
 --- Download parser binary and queries from GitHub, then install
 ---@param callback fun(ok: boolean, err: string|nil)
 local function install_from_github(callback)
-  local artifact = get_artifact_name()
+  local artifact = get_platform_info()
   if not artifact then
     callback(false, "Unsupported platform")
     return
@@ -324,8 +335,9 @@ local function install_from_github(callback)
       return
     end
 
+    local lib_name = parser_lib_name()
     local parser_dir = get_parser_install_dir()
-    local parser_output = parser_dir .. "/lf.so"
+    local parser_output = parser_dir .. "/" .. lib_name
     vim.fn.mkdir(parser_dir, "p")
 
     local parser_url = RELEASES_URL .. "/download/" .. tag .. "/" .. artifact
@@ -334,7 +346,7 @@ local function install_from_github(callback)
     -- Use a temp dir for downloads
     local tmp_dir = vim.fn.tempname()
     vim.fn.mkdir(tmp_dir, "p")
-    local tmp_parser = tmp_dir .. "/lf.so"
+    local tmp_parser = tmp_dir .. "/" .. lib_name
     local tmp_queries = tmp_dir .. "/queries.tar.gz"
 
     vim.notify("[lf.nvim] Downloading parser (" .. tag .. ")...", vim.log.levels.INFO)
@@ -486,12 +498,13 @@ end
 
 -- Install from local source (pre-compiled binary or compile from scratch)
 local function install_from_local(source_path, opts, callback)
+  local lib_name = parser_lib_name()
   local parser_dir = get_parser_install_dir()
-  local parser_output = parser_dir .. "/lf.so"
+  local parser_output = parser_dir .. "/" .. lib_name
   vim.fn.mkdir(parser_dir, "p")
 
   -- Check if pre-compiled parser exists in source
-  local precompiled = source_path .. "/lf.so"
+  local precompiled = source_path .. "/" .. lib_name
   if vim.fn.filereadable(precompiled) == 1 and not opts.compile then
     vim.notify("[lf.nvim] Copying pre-compiled parser...", vim.log.levels.INFO)
     local content = vim.fn.readblob(precompiled)
@@ -569,7 +582,7 @@ end
 -- Uninstall the parser
 function M.uninstall()
   local parser_dir = get_parser_install_dir()
-  local parser_path = parser_dir .. "/lf.so"
+  local parser_path = parser_dir .. "/" .. parser_lib_name()
   local queries_dir = get_queries_dir() .. "/lf"
 
   local removed = false
@@ -615,7 +628,7 @@ function M.status()
     "Queries installed: " .. (M.queries_installed() and "Yes" or "No"),
     "",
     "Source path: " .. (find_source_path() or "Not found"),
-    "Platform artifact: " .. (get_artifact_name() or "Unsupported"),
+    "Platform artifact: " .. (get_platform_info() or "Unsupported"),
   }
 
   -- Check individual query files
