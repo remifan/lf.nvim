@@ -1,0 +1,26 @@
+# tree-sitter generate scaffolding (not needed for lf.nvim)
+.editorconfig
+.gitattributes
+Cargo.toml
+Package.swift
+binding.gyp
+bindings/
+package.json
+pyproject.toml
+setup.py
+
+# Build artifacts
+build/
+prebuilds/
+node_modules/
+target/
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.o
+*.obj
+*.wasm
+*.tgz
+*.pc
