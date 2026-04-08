@@ -303,16 +303,17 @@ require("lf").setup({
 
 ### Lingua Franca Keywords
 - **Core**: `reactor`, `input`, `output`, `action`, `state`, `timer`, `reaction`, `method`, `preamble`
-- **Modifiers**: `public`, `private`, `widthof`, `mutable`
-- **Control flow**: `if`, `else`, `for`, `while`
-- **Temporal**: `startup`, `shutdown`, `after`, `physical`, `logical`
+- **Modifiers**: `main`, `federated`, `realtime`, `mutable`, `const`, `logical`, `physical`
+- **Modes**: `mode`, `initial`, `reset`, `history`
+- **Other**: `after`, `deadline`, `new`, `at`, `widthof`, `startup`, `shutdown`
 
 ### Literals & Operators
-- **Time units**: `nsec`, `msec`, `sec`, `min`, `hour`, `day`, `week`
-- **Numbers**: Integers, floats, scientific notation
-- **Strings**: Single, double, and triple-quoted with escape sequences
-- **Operators**: `->`, `~>`, `::`, arithmetic and logical operators
-- **Booleans**: `true`, `false`, `True`, `False`
+- **Time values**: `100 msec`, `1 sec`, `forever`, `never`
+- **Time units**: `nsec`, `usec`, `msec`, `sec`, `min`, `hour`, `day`, `week` (and abbreviations like `ns`, `us`, `ms`, `s`, `m`, `h`, `d`)
+- **Numbers**: Integers, floats
+- **Strings**: Double-quoted strings, char literals
+- **Operators**: `->` (connections), `~>` (physical connections)
+- **Booleans**: `true`, `false`
 
 ### Embedded Languages
 
@@ -323,9 +324,8 @@ Code within `{= =}` delimiters gets full syntax highlighting:
 - **Rust**: Ownership keywords, macros, lifetimes
 
 ### Comments
-- Line comments: `//` and `#`
+- Line comments: `//`
 - Block comments: `/* */`
-- TODO/FIXME highlighting
 
 ## 📖 Documentation
 
@@ -346,8 +346,10 @@ Topics include:
 ## 🤝 Contributing
 
 Contributions welcome! This plugin combines:
-- Syntax grammar from [VSCode Lingua Franca extension](https://github.com/lf-lang/vscode-lingua-franca)
+- Tree-sitter grammar auto-generated from the official [Lingua Franca Xtext grammar](https://github.com/lf-lang/lingua-franca) via `xtext2ts`
 - LSP server from [Lingua Franca compiler](https://github.com/lf-lang/lingua-franca)
+
+A weekly GitHub Action checks for upstream grammar changes, regenerates the tree-sitter grammar, validates against all upstream test files, and opens a PR automatically.
 
 ### Reporting Issues
 
@@ -370,6 +372,12 @@ Please open an issue with:
 # Clone the repository
 git clone https://github.com/remifan/lf.nvim.git
 cd lf.nvim
+
+# Regenerate tree-sitter grammar from upstream Xtext
+python -m xtext2ts \
+  --xtext /path/to/LinguaFranca.xtext \
+  --output tree-sitter-lf/grammar.js
+cd tree-sitter-lf && tree-sitter generate
 
 # Test locally (syntax only)
 nvim -u NONE -c "set rtp+=." test.lf
@@ -419,6 +427,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Syntax grammar based on the official [VSCode Lingua Franca extension](https://github.com/lf-lang/vscode-lingua-franca)
+- Tree-sitter grammar generated from the official [Lingua Franca Xtext grammar](https://github.com/lf-lang/lingua-franca)
 - LSP server from the [Lingua Franca compiler project](https://github.com/lf-lang/lingua-franca)
 - Built for the [Lingua Franca](https://www.lf-lang.org/) community
