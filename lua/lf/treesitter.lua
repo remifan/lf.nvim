@@ -245,12 +245,12 @@ local function install_from_github(callback)
   vim.fn.mkdir(parser_dir, "p")
 
   local parser_url = ARTIFACTS_URL .. "/" .. artifact
-  local queries_url = ARTIFACTS_URL .. "/queries.tar.gz"
+  local queries_url = ARTIFACTS_URL .. "/queries.zip"
 
   local tmp_dir = vim.fn.tempname()
   vim.fn.mkdir(tmp_dir, "p")
   local tmp_parser = tmp_dir .. "/" .. lib_name
-  local tmp_queries = tmp_dir .. "/queries.tar.gz"
+  local tmp_queries = tmp_dir .. "/queries.zip"
 
   vim.notify("[lf.nvim] Downloading tree-sitter parser...", vim.log.levels.INFO)
 
@@ -277,14 +277,22 @@ local function install_from_github(callback)
       end
       vim.fn.setfperm(parser_output, "rwxr-xr-x")
 
-      -- Extract queries
+      -- Extract queries (cross-platform)
       local queries_dst = get_queries_dir() .. "/lf"
       vim.fn.mkdir(queries_dst, "p")
-      local tar_ret = os.execute("tar xzf " .. vim.fn.shellescape(tmp_queries) .. " -C " .. vim.fn.shellescape(queries_dst))
+      local unzip_cmd
+      local _, _, plat = get_platform_info()
+      if plat == "win" then
+        unzip_cmd = 'powershell -Command "Expand-Archive -Force '
+          .. "'" .. tmp_queries .. "' -DestinationPath '" .. queries_dst .. "'" .. '"'
+      else
+        unzip_cmd = "unzip -oq " .. vim.fn.shellescape(tmp_queries) .. " -d " .. vim.fn.shellescape(queries_dst)
+      end
+      local unzip_ret = os.execute(unzip_cmd)
 
       vim.fn.delete(tmp_dir, "rf")
 
-      if tar_ret ~= 0 then
+      if unzip_ret ~= 0 then
         callback(false, "Failed to extract queries")
         return
       end
