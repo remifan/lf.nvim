@@ -59,24 +59,24 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: lf-linux-x64.so
-            compile: cc -shared -o lf-linux-x64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            artifact: treesitter-linux-x64.so
+            compile: cc -shared -o treesitter-linux-x64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
           - os: ubuntu-24.04-arm
-            artifact: lf-linux-arm64.so
-            compile: cc -shared -o lf-linux-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            artifact: treesitter-linux-arm64.so
+            compile: cc -shared -o treesitter-linux-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
           - os: macos-latest
-            artifact: lf-darwin-x64.so
-            compile: cc -shared -o lf-darwin-x64.so -fPIC -O2 -target x86_64-apple-macos11 -I./src src/parser.c src/scanner.c
+            artifact: treesitter-darwin-x64.so
+            compile: cc -shared -o treesitter-darwin-x64.so -fPIC -O2 -target x86_64-apple-macos11 -I./src src/parser.c src/scanner.c
           - os: macos-latest
-            artifact: lf-darwin-arm64.so
-            compile: cc -shared -o lf-darwin-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            artifact: treesitter-darwin-arm64.so
+            compile: cc -shared -o treesitter-darwin-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
           - os: windows-latest
-            artifact: lf-win-x64.dll
-            compile: gcc -shared -o lf-win-x64.dll -O2 -I./src src/parser.c src/scanner.c
+            artifact: treesitter-win-x64.dll
+            compile: gcc -shared -o treesitter-win-x64.dll -O2 -I./src src/parser.c src/scanner.c
           - os: windows-latest
-            artifact: lf-win-arm64.dll
+            artifact: treesitter-win-arm64.dll
             setup: choco install llvm --params "'/InstallAllUsers'" -y
-            compile: clang -shared -o lf-win-arm64.dll -O2 --target=aarch64-pc-windows-msvc -I./src src/parser.c src/scanner.c
+            compile: clang -shared -o treesitter-win-arm64.dll -O2 --target=aarch64-pc-windows-msvc -I./src src/parser.c src/scanner.c
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tree-sitter-lf

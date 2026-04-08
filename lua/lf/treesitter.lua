@@ -45,7 +45,7 @@ local function get_platform_info()
     return nil, nil, nil
   end
 
-  return "lf-" .. platform .. "-" .. cpu .. "." .. ext, ext, platform
+  return "treesitter-" .. platform .. "-" .. cpu .. "." .. ext, ext, platform
 end
 
 -- Parser library filename for the current platform (lf.so or lf.dll)
