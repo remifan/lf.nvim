@@ -82,34 +82,37 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: cd tree-sitter-lf && tree-sitter generate
 
+      - name: Checkout upstream test files at anchored version
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: lf-lang/lingua-franca
+          ref: ${{ steps.resolve.outputs.version }}
+          sparse-checkout: test
+          path: /tmp/lingua-franca
+
       - name: Validate against upstream test files
         if: steps.check.outputs.changed == 'true'
         run: |
-          # Fetch some test .lf files from the release
-          mkdir -p /tmp/lf-tests
-          for f in test/C/src/Minimal.lf test/C/src/HelloWorld.lf test/C/src/Composition.lf \
-                   test/C/src/Deadline.lf test/C/src/TimeLimit.lf test/C/src/Schedule.lf \
-                   test/C/src/Preamble.lf test/C/src/Import.lf \
-                   test/Python/src/HelloWorld.lf test/TypeScript/src/HelloWorld.lf; do
-            curl -fSL "https://raw.githubusercontent.com/lf-lang/lingua-franca/${{ steps.resolve.outputs.version }}/$f" \
-              -o "/tmp/lf-tests/$(basename $f)" 2>/dev/null || true
-          done
-
           cd tree-sitter-lf
-          total=0; errors=0
-          for f in /tmp/lf-tests/*.lf; do
-            [ -f "$f" ] || continue
+          total=0; errors=0; failed=""
+          for f in $(find /tmp/lingua-franca/test -name "*.lf"); do
             total=$((total + 1))
             if tree-sitter parse "$f" 2>&1 | grep -q "ERROR"; then
               errors=$((errors + 1))
-              echo "FAIL: $(basename $f)"
+              failed="$failed  $(echo $f | sed 's|/tmp/lingua-franca/||')\n"
             fi
           done
-          echo "Validation: $errors failures out of $total files"
-          # Allow up to 10% failure rate (some edge cases may not parse)
-          max_errors=$((total / 10 + 1))
+
+          echo "Validation against LF ${{ steps.resolve.outputs.version }}: $errors failures out of $total files"
+          if [ $errors -gt 0 ]; then
+            echo -e "Failed:\n$failed"
+          fi
+
+          # Fail if more than 2% of files have errors
+          max_errors=$((total * 2 / 100 + 1))
           if [ $errors -gt $max_errors ]; then
-            echo "Too many failures, aborting."
+            echo "Error rate exceeds 2% threshold, aborting."
             exit 1
           fi
 
