@@ -37,6 +37,9 @@ For users who only want syntax highlighting:
 {
   "remifan/lf.nvim",
   ft = "lf",
+  dependencies = {
+    "nvim-treesitter/nvim-treesitter",  -- Optional: for incremental selection and textobjects
+  },
   config = function()
     require("lf").setup({
       enable_lsp = false,  -- Disable LSP features
@@ -59,7 +62,8 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
   "remifan/lf.nvim",
   ft = "lf",
   dependencies = {
-    "nvim-telescope/telescope.nvim",  -- Optional: enhanced library browser
+    "nvim-treesitter/nvim-treesitter",  -- Optional: for incremental selection and textobjects
+    "nvim-telescope/telescope.nvim",    -- Optional: enhanced library browser
   },
   -- Note: Diagram dependencies build automatically on first use
   -- No need to specify build command!
@@ -115,15 +119,13 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
 
 ## 🌳 Tree-sitter Setup
 
-For modern syntax highlighting, incremental selection, and textobjects:
+The tree-sitter parser is **automatically installed** the first time you open a `.lf` file (requires `curl`). You can also install or reinstall manually:
 
 ```vim
 :LFTSInstall
 ```
 
-This installs the LF tree-sitter parser and query files. Requires:
-- `nvim-treesitter` plugin
-- C compiler (gcc or clang) if compiling from source
+Pre-built parser binaries are downloaded from GitHub for Linux, macOS, and Windows (x64 and ARM64). Falls back to local compilation if the download fails.
 
 **Incremental Selection** (with nvim-treesitter configured):
 - Press `<CR>` in normal mode to start selection

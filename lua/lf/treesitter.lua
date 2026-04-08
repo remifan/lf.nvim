@@ -436,29 +436,37 @@ local function install_from_local(source_path, opts, callback)
   end)
 end
 
-local function on_install_success()
+local function on_install_success(on_done)
   vim.notify("[lf.nvim] LF treesitter parser installed successfully!", vim.log.levels.INFO)
   pcall(function()
     vim._ts_remove_language("lf")
     vim.treesitter.language.add("lf")
   end)
+  if on_done then
+    on_done()
+  end
 end
 
 -- Main install function
 function M.install(opts)
   opts = opts or {}
   local force = opts.force or false
+  local on_done = opts.on_done
 
   -- Check if already installed
   if M.is_installed() and M.queries_installed() and not force then
-    vim.notify("[lf.nvim] LF treesitter parser is already installed. Use :LFTSInstall! to reinstall.", vim.log.levels.INFO)
+    if on_done then
+      on_done()
+    else
+      vim.notify("[lf.nvim] LF treesitter parser is already installed. Use :LFTSInstall! to reinstall.", vim.log.levels.INFO)
+    end
     return
   end
 
   -- Try GitHub download first
   install_from_github(function(ok, err)
     if ok then
-      on_install_success()
+      on_install_success(on_done)
       return
     end
 
@@ -481,7 +489,7 @@ function M.install(opts)
 
     install_from_local(source_path, opts, function(lok, lerr)
       if lok then
-        on_install_success()
+        on_install_success(on_done)
       else
         vim.notify("[lf.nvim] " .. (lerr or "Unknown error"), vim.log.levels.ERROR)
       end

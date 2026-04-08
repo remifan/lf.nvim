@@ -1,9 +1,20 @@
 -- Filetype plugin for Lingua Franca
 -- Sets buffer-local options and configurations
 
--- Start tree-sitter highlighting if parser is available
+-- Start tree-sitter highlighting if parser is available, otherwise auto-install
 if pcall(vim.treesitter.language.inspect, "lf") then
   vim.treesitter.start(vim.api.nvim_get_current_buf(), "lf")
+elseif vim.fn.executable("curl") == 1 then
+  local bufnr = vim.api.nvim_get_current_buf()
+  require("lf.treesitter").install({
+    force = false,
+    on_done = function()
+      -- Start highlighting on the buffer that triggered the install
+      if vim.api.nvim_buf_is_valid(bufnr) then
+        pcall(vim.treesitter.start, bufnr, "lf")
+      end
+    end,
+  })
 end
 
 -- Set comment string for commentary.vim and similar plugins
