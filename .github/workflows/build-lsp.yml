@@ -96,10 +96,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LSP_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          # Read the LF upstream version from the repo
           lf_ver=$(gh api repos/${{ github.repository }}/contents/.lf-upstream-version \
             --jq '.content' 2>/dev/null | base64 -d | tr -d '\n' || echo "unknown")
-
-          title="Artifacts for LF ${lf_ver} · LSP ${LSP_VERSION}"
-
-          gh release edit artifacts --repo "${{ github.repository }}" --title "$title"
+          gh release edit artifacts --repo "${{ github.repository }}" \
+            --title "Artifacts for LF ${lf_ver}"
