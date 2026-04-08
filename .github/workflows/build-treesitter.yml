@@ -1,0 +1,112 @@
+name: Build Tree-sitter Parser
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # Weekly on Monday
+  workflow_dispatch:
+    inputs:
+      ts_ref:
+        description: "tree-sitter-lf git ref (branch/tag/sha). Leave empty for latest main."
+        required: false
+        type: string
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.resolve.outputs.version }}
+      should_build: ${{ steps.resolve.outputs.should_build }}
+    steps:
+      - name: Resolve ref and check if release exists
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ref="${{ inputs.ts_ref }}"
+          if [ -z "$ref" ]; then
+            ref="main"
+          fi
+
+          # Get the commit sha for this ref
+          sha=$(gh api "repos/remifan/tree-sitter-lf/commits/$ref" --jq '.sha' | head -c 7)
+          version="ts-${sha}"
+
+          echo "ref=$ref"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$version" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release $version already exists, skipping."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release $version not found, will build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.should_build == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: lf-linux-x64.so
+          - os: macos-13
+            artifact: lf-darwin-x64.so
+          - os: macos-latest
+            artifact: lf-darwin-arm64.so
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout tree-sitter-lf
+        uses: actions/checkout@v4
+        with:
+          repository: remifan/tree-sitter-lf
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - name: Compile parser
+        run: |
+          cc -shared -o "${{ matrix.artifact }}" -fPIC -O2 \
+            -I./src src/parser.c src/scanner.c
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tree-sitter-lf (for queries)
+        uses: actions/checkout@v4
+        with:
+          repository: remifan/tree-sitter-lf
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - name: Package queries
+        run: tar czf queries.tar.gz -C queries .
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          REF: ${{ needs.resolve.outputs.ref }}
+        run: |
+          gh release create "$VERSION" \
+            --repo "${{ github.repository }}" \
+            --title "Tree-sitter Parser ($VERSION)" \
+            --notes "Pre-built tree-sitter LF parser from [remifan/tree-sitter-lf@${REF}](https://github.com/remifan/tree-sitter-lf/tree/${REF}).
+
+          ## Usage
+          Install directly in Neovim:
+          \`\`\`vim
+          :LFTSInstall
+          \`\`\`" \
+            artifacts/* queries.tar.gz

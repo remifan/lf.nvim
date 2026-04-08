@@ -1,18 +1,49 @@
 -- Treesitter installation for Lingua Franca
--- Provides :LFInstall command similar to :TSInstall
+-- Provides :LFTSInstall command
+-- Downloads pre-built parser from GitHub releases, falls back to local compilation
 
 local M = {}
 
--- Source paths (where tree-sitter-lf is located)
+-- Source paths (where tree-sitter-lf is located) for local fallback
 -- Users can override this via setup()
 M.config = {
-  -- Path to tree-sitter-lf source directory
+  -- Path to tree-sitter-lf source directory (for local fallback)
   source_path = nil,
-  -- Compilers to try (in order)
+  -- Compilers to try (in order) for local fallback
   compilers = { vim.fn.getenv("CC"), "cc", "gcc", "clang" },
 }
 
 local uv = vim.loop
+
+local GITHUB_REPO = "remifan/lf.nvim"
+local RELEASES_API = "https://api.github.com/repos/" .. GITHUB_REPO .. "/releases"
+local RELEASES_URL = "https://github.com/" .. GITHUB_REPO .. "/releases"
+
+-- Detect platform: returns artifact name like "lf-linux-x64.so"
+local function get_artifact_name()
+  local os_name = vim.loop.os_uname().sysname:lower()
+  local arch = vim.loop.os_uname().machine
+
+  local platform
+  if os_name == "linux" then
+    platform = "linux"
+  elseif os_name == "darwin" then
+    platform = "darwin"
+  else
+    return nil
+  end
+
+  local cpu
+  if arch == "x86_64" or arch == "amd64" then
+    cpu = "x64"
+  elseif arch == "aarch64" or arch == "arm64" then
+    cpu = "arm64"
+  else
+    return nil
+  end
+
+  return "lf-" .. platform .. "-" .. cpu .. ".so"
+end
 
 -- Get nvim-treesitter parser installation directory
 local function get_parser_install_dir()
@@ -30,9 +61,7 @@ local function get_parser_install_dir()
 
   -- Priority order: lazy.nvim > packer > user data dir
   for _, path in ipairs(paths) do
-    -- Prefer the lazy.nvim managed path (most common modern setup)
     if path:match("lazy/nvim%-treesitter/parser") then
-      -- Check if writable
       local test_file = path .. "/.write_test"
       local f = io.open(test_file, "w")
       if f then
@@ -43,7 +72,6 @@ local function get_parser_install_dir()
     end
   end
 
-  -- Try packer path
   for _, path in ipairs(paths) do
     if path:match("packer/") or path:match("site/pack/") then
       local test_file = path .. "/.write_test"
@@ -80,13 +108,12 @@ local function get_queries_dir()
   end
 
   -- Fall back to user data directory for queries
-  -- Neovim looks for queries in runtime path, so we use after/queries
   local data_queries = vim.fn.stdpath("data") .. "/site/queries"
   vim.fn.mkdir(data_queries, "p")
   return data_queries
 end
 
--- Find a working C compiler
+-- Find a working C compiler (for local fallback)
 local function find_compiler()
   for _, cc in ipairs(M.config.compilers) do
     if cc and type(cc) == "string" and vim.fn.executable(cc) == 1 then
@@ -96,30 +123,24 @@ local function find_compiler()
   return nil
 end
 
--- Find the tree-sitter-lf source directory
+-- Find the tree-sitter-lf source directory (for local fallback)
 local function find_source_path()
   if M.config.source_path and vim.fn.isdirectory(M.config.source_path) == 1 then
     return M.config.source_path
   end
 
-  -- Try common locations relative to this plugin
   local plugin_path = debug.getinfo(1, "S").source:sub(2)
-  local plugin_dir = vim.fn.fnamemodify(plugin_path, ":h:h:h:h") -- Go up to lf.nvim root
+  local plugin_dir = vim.fn.fnamemodify(plugin_path, ":h:h:h:h")
 
   local possible_paths = {
-    -- Sibling directory (lf.nvim/../tree-sitter-lf)
     vim.fn.fnamemodify(plugin_dir, ":h") .. "/tree-sitter-lf",
-    -- Inside plugin (lf.nvim/tree-sitter-lf)
     plugin_dir .. "/tree-sitter-lf",
-    -- User's workspace
     vim.fn.expand("~/Workspace/lf.nvim/tree-sitter-lf"),
-    -- Environment variable
     vim.fn.getenv("LF_TREESITTER_PATH"),
   }
 
   for _, path in ipairs(possible_paths) do
     if path and vim.fn.isdirectory(path) == 1 then
-      -- Verify it has grammar.js
       if vim.fn.filereadable(path .. "/grammar.js") == 1 then
         return path
       end
@@ -143,7 +164,223 @@ function M.queries_installed()
   return vim.fn.filereadable(highlights_path) == 1
 end
 
--- Compile the parser from source
+-- Parse GitHub releases JSON to find the latest ts-* tag
+local function parse_ts_tag(json_str)
+  local ok, releases = pcall(vim.json.decode, json_str)
+  if not ok or type(releases) ~= "table" then
+    return nil
+  end
+  for _, rel in ipairs(releases) do
+    local tag = rel.tag_name or ""
+    if tag:match("^ts%-") then
+      return tag
+    end
+  end
+  return nil
+end
+
+-- Fetch latest ts tag via curl (fallback)
+local function fetch_latest_ts_tag_curl(callback)
+  if vim.fn.executable("curl") == 0 then
+    callback(nil, "Neither gh nor curl found")
+    return
+  end
+
+  local stdout_chunks = {}
+  local stdout = uv.new_pipe(false)
+  local stderr = uv.new_pipe(false)
+  local handle
+
+  handle = uv.spawn("curl", {
+    args = { "-fsSL", RELEASES_API },
+    stdio = { nil, stdout, stderr },
+  }, function(code)
+    stdout:close()
+    stderr:close()
+    handle:close()
+    vim.schedule(function()
+      if code ~= 0 then
+        callback(nil, "Failed to fetch releases from GitHub")
+        return
+      end
+      local tag = parse_ts_tag(table.concat(stdout_chunks))
+      if tag then
+        callback(tag, nil)
+      else
+        callback(nil, "No tree-sitter release found")
+      end
+    end)
+  end)
+
+  if not handle then
+    callback(nil, "Failed to spawn curl")
+    return
+  end
+
+  stdout:read_start(function(_, data)
+    if data then table.insert(stdout_chunks, data) end
+  end)
+  stderr:read_start(function() end)
+end
+
+--- Fetch the latest treesitter release tag from GitHub
+---@param callback fun(tag: string|nil, err: string|nil)
+local function fetch_latest_ts_tag(callback)
+  -- Try gh first
+  if vim.fn.executable("gh") == 1 then
+    local stdout_chunks = {}
+    local stdout = uv.new_pipe(false)
+    local stderr = uv.new_pipe(false)
+    local handle
+    handle = uv.spawn("gh", {
+      args = { "api", "repos/" .. GITHUB_REPO .. "/releases",
+        "--jq", '[.[] | select(.tag_name | startswith("ts-"))][0].tag_name' },
+      stdio = { nil, stdout, stderr },
+    }, function(code)
+      stdout:close()
+      stderr:close()
+      handle:close()
+      vim.schedule(function()
+        if code == 0 then
+          local tag = vim.trim(table.concat(stdout_chunks))
+          if tag ~= "" and tag ~= "null" then
+            callback(tag, nil)
+            return
+          end
+        end
+        fetch_latest_ts_tag_curl(callback)
+      end)
+    end)
+
+    if handle then
+      stdout:read_start(function(_, data)
+        if data then table.insert(stdout_chunks, data) end
+      end)
+      stderr:read_start(function() end)
+      return
+    end
+  end
+
+  fetch_latest_ts_tag_curl(callback)
+end
+
+--- Download a file from GitHub release via curl
+---@param url string
+---@param dest string
+---@param callback fun(ok: boolean, err: string|nil)
+local function download_file(url, dest, callback)
+  if vim.fn.executable("curl") == 0 then
+    callback(false, "curl is required for download")
+    return
+  end
+
+  local stderr_chunks = {}
+  local stdout = uv.new_pipe(false)
+  local stderr = uv.new_pipe(false)
+  local handle
+
+  handle = uv.spawn("curl", {
+    args = { "-fSL", "--progress-bar", "-o", dest, url },
+    stdio = { nil, stdout, stderr },
+  }, function(code)
+    stdout:close()
+    stderr:close()
+    handle:close()
+    vim.schedule(function()
+      if code == 0 then
+        callback(true, nil)
+      else
+        vim.fn.delete(dest)
+        callback(false, "Download failed: " .. table.concat(stderr_chunks))
+      end
+    end)
+  end)
+
+  if not handle then
+    callback(false, "Failed to spawn curl")
+    return
+  end
+
+  stdout:read_start(function() end)
+  stderr:read_start(function(_, data)
+    if data then table.insert(stderr_chunks, data) end
+  end)
+end
+
+--- Download parser binary and queries from GitHub, then install
+---@param callback fun(ok: boolean, err: string|nil)
+local function install_from_github(callback)
+  local artifact = get_artifact_name()
+  if not artifact then
+    callback(false, "Unsupported platform")
+    return
+  end
+
+  vim.notify("[lf.nvim] Fetching latest tree-sitter release...", vim.log.levels.INFO)
+
+  fetch_latest_ts_tag(function(tag, err)
+    if not tag then
+      callback(false, err or "No release found")
+      return
+    end
+
+    local parser_dir = get_parser_install_dir()
+    local parser_output = parser_dir .. "/lf.so"
+    vim.fn.mkdir(parser_dir, "p")
+
+    local parser_url = RELEASES_URL .. "/download/" .. tag .. "/" .. artifact
+    local queries_url = RELEASES_URL .. "/download/" .. tag .. "/queries.tar.gz"
+
+    -- Use a temp dir for downloads
+    local tmp_dir = vim.fn.tempname()
+    vim.fn.mkdir(tmp_dir, "p")
+    local tmp_parser = tmp_dir .. "/lf.so"
+    local tmp_queries = tmp_dir .. "/queries.tar.gz"
+
+    vim.notify("[lf.nvim] Downloading parser (" .. tag .. ")...", vim.log.levels.INFO)
+
+    download_file(parser_url, tmp_parser, function(p_ok, p_err)
+      if not p_ok then
+        vim.fn.delete(tmp_dir, "rf")
+        callback(false, "Parser download failed: " .. (p_err or ""))
+        return
+      end
+
+      download_file(queries_url, tmp_queries, function(q_ok, q_err)
+        if not q_ok then
+          vim.fn.delete(tmp_dir, "rf")
+          callback(false, "Queries download failed: " .. (q_err or ""))
+          return
+        end
+
+        -- Install parser binary
+        local content = vim.fn.readblob(tmp_parser)
+        if vim.fn.writefile(content, parser_output, "b") ~= 0 then
+          vim.fn.delete(tmp_dir, "rf")
+          callback(false, "Failed to write parser to " .. parser_output)
+          return
+        end
+        vim.fn.setfperm(parser_output, "rwxr-xr-x")
+
+        -- Extract queries
+        local queries_dst = get_queries_dir() .. "/lf"
+        vim.fn.mkdir(queries_dst, "p")
+        local tar_ret = os.execute("tar xzf " .. vim.fn.shellescape(tmp_queries) .. " -C " .. vim.fn.shellescape(queries_dst))
+
+        vim.fn.delete(tmp_dir, "rf")
+
+        if tar_ret ~= 0 then
+          callback(false, "Failed to extract queries")
+          return
+        end
+
+        callback(true, nil)
+      end)
+    end)
+  end)
+end
+
+-- Compile the parser from local source (fallback)
 local function compile_parser(source_path, output_path, callback)
   local cc = find_compiler()
   if not cc then
@@ -159,7 +396,6 @@ local function compile_parser(source_path, output_path, callback)
     return
   end
 
-  -- Build compile command
   local src_files = { parser_c }
   if vim.fn.filereadable(scanner_c) == 1 then
     table.insert(src_files, scanner_c)
@@ -170,19 +406,14 @@ local function compile_parser(source_path, output_path, callback)
     "-o", output_path,
     "-fPIC",
     "-I" .. source_path .. "/src",
+    "-O2",
   }
-
-  -- Add optimization flags
-  table.insert(args, "-O2")
-
-  -- Add source files
   for _, src in ipairs(src_files) do
     table.insert(args, src)
   end
 
   vim.notify("[lf.nvim] Compiling parser with " .. cc .. "...", vim.log.levels.INFO)
 
-  -- Run compiler asynchronously
   local stdout = uv.new_pipe(false)
   local stderr = uv.new_pipe(false)
   local error_output = ""
@@ -210,19 +441,17 @@ local function compile_parser(source_path, output_path, callback)
     return
   end
 
-  stderr:read_start(function(err, data)
+  stderr:read_start(function(_, data)
     if data then
       error_output = error_output .. data
     end
   end)
 end
 
--- Copy query files
+-- Copy query files from local source (fallback)
 local function copy_queries(source_path, callback)
   local queries_src = source_path .. "/queries"
   local queries_dst = get_queries_dir() .. "/lf"
-
-  -- Create destination directory
   vim.fn.mkdir(queries_dst, "p")
 
   local query_files = {
@@ -245,8 +474,6 @@ local function copy_queries(source_path, callback)
       if ok ~= 0 then
         table.insert(errors, "Failed to copy " .. qf)
       end
-    else
-      -- Not an error if optional query file doesn't exist
     end
   end
 
@@ -257,61 +484,20 @@ local function copy_queries(source_path, callback)
   end
 end
 
--- Main install function
-function M.install(opts)
-  opts = opts or {}
-  local force = opts.force or false
-
-  -- Check if already installed
-  if M.is_installed() and M.queries_installed() and not force then
-    vim.notify("[lf.nvim] LF treesitter parser is already installed. Use :LFInstall! to reinstall.", vim.log.levels.INFO)
-    return
-  end
-
-  -- Find source path
-  local source_path = find_source_path()
-  if not source_path then
-    vim.notify(
-      "[lf.nvim] tree-sitter-lf source not found.\n\n" ..
-      "Please set the source path:\n" ..
-      "  require('lf.treesitter').setup({ source_path = '/path/to/tree-sitter-lf' })\n\n" ..
-      "Or set the LF_TREESITTER_PATH environment variable.",
-      vim.log.levels.ERROR
-    )
-    return
-  end
-
-  vim.notify("[lf.nvim] Installing LF treesitter parser from: " .. source_path, vim.log.levels.INFO)
-
+-- Install from local source (pre-compiled binary or compile from scratch)
+local function install_from_local(source_path, opts, callback)
   local parser_dir = get_parser_install_dir()
   local parser_output = parser_dir .. "/lf.so"
-
-  -- Ensure parser directory exists
   vim.fn.mkdir(parser_dir, "p")
 
   -- Check if pre-compiled parser exists in source
   local precompiled = source_path .. "/lf.so"
   if vim.fn.filereadable(precompiled) == 1 and not opts.compile then
-    -- Copy pre-compiled parser
     vim.notify("[lf.nvim] Copying pre-compiled parser...", vim.log.levels.INFO)
     local content = vim.fn.readblob(precompiled)
     if vim.fn.writefile(content, parser_output, "b") == 0 then
-      -- Make executable
       vim.fn.setfperm(parser_output, "rwxr-xr-x")
-
-      -- Copy queries
-      copy_queries(source_path, function(ok, err)
-        if ok then
-          vim.notify("[lf.nvim] LF treesitter parser installed successfully!", vim.log.levels.INFO)
-          -- Try to reload the parser
-          pcall(function()
-            vim._ts_remove_language("lf")
-            vim.treesitter.language.add("lf")
-          end)
-        else
-          vim.notify("[lf.nvim] Parser installed but query copy failed: " .. (err or "unknown error"), vim.log.levels.WARN)
-        end
-      end)
+      copy_queries(source_path, callback)
       return
     end
   end
@@ -319,24 +505,62 @@ function M.install(opts)
   -- Compile from source
   compile_parser(source_path, parser_output, function(ok, err)
     if not ok then
-      vim.notify("[lf.nvim] " .. (err or "Unknown compilation error"), vim.log.levels.ERROR)
+      callback(false, err)
+      return
+    end
+    vim.fn.setfperm(parser_output, "rwxr-xr-x")
+    copy_queries(source_path, callback)
+  end)
+end
+
+local function on_install_success()
+  vim.notify("[lf.nvim] LF treesitter parser installed successfully!", vim.log.levels.INFO)
+  pcall(function()
+    vim._ts_remove_language("lf")
+    vim.treesitter.language.add("lf")
+  end)
+end
+
+-- Main install function
+function M.install(opts)
+  opts = opts or {}
+  local force = opts.force or false
+
+  -- Check if already installed
+  if M.is_installed() and M.queries_installed() and not force then
+    vim.notify("[lf.nvim] LF treesitter parser is already installed. Use :LFTSInstall! to reinstall.", vim.log.levels.INFO)
+    return
+  end
+
+  -- Try GitHub download first
+  install_from_github(function(ok, err)
+    if ok then
+      on_install_success()
       return
     end
 
-    -- Make executable
-    vim.fn.setfperm(parser_output, "rwxr-xr-x")
+    vim.notify("[lf.nvim] GitHub download failed (" .. (err or "unknown") .. "), trying local source...", vim.log.levels.WARN)
 
-    -- Copy queries
-    copy_queries(source_path, function(qok, qerr)
-      if qok then
-        vim.notify("[lf.nvim] LF treesitter parser installed successfully!", vim.log.levels.INFO)
-        -- Try to reload the parser
-        pcall(function()
-          vim._ts_remove_language("lf")
-          vim.treesitter.language.add("lf")
-        end)
+    -- Fall back to local source
+    local source_path = find_source_path()
+    if not source_path then
+      vim.notify(
+        "[lf.nvim] Could not download from GitHub and no local source found.\n\n" ..
+        "Ensure you have internet access, or set the local source path:\n" ..
+        "  require('lf.treesitter').setup({ source_path = '/path/to/tree-sitter-lf' })\n\n" ..
+        "Or set the LF_TREESITTER_PATH environment variable.",
+        vim.log.levels.ERROR
+      )
+      return
+    end
+
+    vim.notify("[lf.nvim] Installing from local source: " .. source_path, vim.log.levels.INFO)
+
+    install_from_local(source_path, opts, function(lok, lerr)
+      if lok then
+        on_install_success()
       else
-        vim.notify("[lf.nvim] Parser compiled but query copy failed: " .. (qerr or "unknown error"), vim.log.levels.WARN)
+        vim.notify("[lf.nvim] " .. (lerr or "Unknown error"), vim.log.levels.ERROR)
       end
     end)
   end)
@@ -391,6 +615,7 @@ function M.status()
     "Queries installed: " .. (M.queries_installed() and "Yes" or "No"),
     "",
     "Source path: " .. (find_source_path() or "Not found"),
+    "Platform artifact: " .. (get_artifact_name() or "Unsupported"),
   }
 
   -- Check individual query files
