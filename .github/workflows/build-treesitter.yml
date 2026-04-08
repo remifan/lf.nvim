@@ -1,89 +1,42 @@
 name: Build Tree-sitter Parser
 
 on:
-  schedule:
-    - cron: "0 0 * * 1"  # Weekly on Monday
+  push:
+    branches: [main]
+    paths:
+      - "tree-sitter-lf/src/**"
+      - "tree-sitter-lf/grammar.js"
+      - "tree-sitter-lf/queries/**"
   workflow_dispatch:
-    inputs:
-      ts_version:
-        description: "tree-sitter-lf release tag (e.g. v0.0.1). Leave empty to auto-detect latest."
-        required: false
-        type: string
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.resolve.outputs.version }}
-      should_build: ${{ steps.resolve.outputs.should_build }}
-    steps:
-      - name: Resolve version to build
-        id: resolve
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -n "${{ inputs.ts_version }}" ]; then
-            version="${{ inputs.ts_version }}"
-          else
-            version=$(gh api repos/remifan/tree-sitter-lf/releases \
-              --jq '[.[] | select(.prerelease == false)][0].tag_name')
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-          # Check if this version's parsers already exist by reading ts-version.txt
-          current=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
-            --jq '.assets[] | select(.name == "ts-version.txt") | .name' 2>/dev/null || true)
-
-          if [ -n "$current" ]; then
-            # Download and compare
-            gh release download artifacts --repo "${{ github.repository }}" \
-              --pattern "ts-version.txt" --dir /tmp --clobber 2>/dev/null || true
-            existing=$(cat /tmp/ts-version.txt 2>/dev/null || true)
-            if [ "$existing" = "$version" ]; then
-              echo "Tree-sitter $version already built, skipping."
-              echo "should_build=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "Tree-sitter version changed ($existing -> $version), will build."
-              echo "should_build=true" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "No existing tree-sitter build, will build."
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-          fi
-
   build:
-    needs: check
-    if: needs.check.outputs.should_build == 'true'
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             artifact: treesitter-linux-x64.so
-            compile: cc -shared -o treesitter-linux-x64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            compile: cc -shared -o treesitter-linux-x64.so -fPIC -O2 -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
           - os: ubuntu-24.04-arm
             artifact: treesitter-linux-arm64.so
-            compile: cc -shared -o treesitter-linux-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            compile: cc -shared -o treesitter-linux-arm64.so -fPIC -O2 -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
           - os: macos-latest
             artifact: treesitter-darwin-x64.so
-            compile: cc -shared -o treesitter-darwin-x64.so -fPIC -O2 -target x86_64-apple-macos11 -I./src src/parser.c src/scanner.c
+            compile: cc -shared -o treesitter-darwin-x64.so -fPIC -O2 -target x86_64-apple-macos11 -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
           - os: macos-latest
             artifact: treesitter-darwin-arm64.so
-            compile: cc -shared -o treesitter-darwin-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+            compile: cc -shared -o treesitter-darwin-arm64.so -fPIC -O2 -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
           - os: windows-latest
             artifact: treesitter-win-x64.dll
-            compile: gcc -shared -o treesitter-win-x64.dll -O2 -I./src src/parser.c src/scanner.c
+            compile: gcc -shared -o treesitter-win-x64.dll -O2 -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
           - os: windows-latest
             artifact: treesitter-win-arm64.dll
             setup: choco install llvm --params "'/InstallAllUsers'" -y
-            compile: clang -shared -o treesitter-win-arm64.dll -O2 --target=aarch64-pc-windows-msvc -I./src src/parser.c src/scanner.c
+            compile: clang -shared -o treesitter-win-arm64.dll -O2 --target=aarch64-pc-windows-msvc -I./tree-sitter-lf/src tree-sitter-lf/src/parser.c tree-sitter-lf/src/scanner.c
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout tree-sitter-lf
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: remifan/tree-sitter-lf
-          ref: ${{ needs.check.outputs.version }}
 
       - name: Setup toolchain
         if: matrix.setup
@@ -99,20 +52,14 @@ jobs:
           path: ${{ matrix.artifact }}
 
   release:
-    needs: [check, build]
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout tree-sitter-lf (for queries)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: remifan/tree-sitter-lf
-          ref: ${{ needs.check.outputs.version }}
 
       - name: Package queries
-        run: cd queries && zip -r ../queries.zip .
-
-      - name: Write version marker
-        run: echo "${{ needs.check.outputs.version }}" > ts-version.txt
+        run: cd tree-sitter-lf/queries && zip -r ../../queries.zip .
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -127,33 +74,27 @@ jobs:
           gh release view artifacts --repo "${{ github.repository }}" > /dev/null 2>&1 || \
           gh release create artifacts --repo "${{ github.repository }}" \
             --title "Pre-built artifacts" \
-            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
-
-          Install in Neovim:
-          \`\`\`vim
-          :LFLspInstall
-          :LFTSInstall
-          \`\`\`"
+            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim."
 
       - name: Upload to artifacts release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload artifacts \
-            artifacts/* queries.zip ts-version.txt \
+            artifacts/* queries.zip \
             --repo "${{ github.repository }}" --clobber
 
       - name: Update release title
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TS_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          # Read LSP version from existing jar asset name
+          ts_sha=$(git log -1 --format=%h -- tree-sitter-lf/)
+
           lsp_ver=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
             --jq '[.assets[].name | select(startswith("lsp-"))][0] // ""' \
             | sed -n 's/^lsp-\(.*\)-all\.jar$/v\1/p')
 
-          title="Tree-sitter ${TS_VERSION}"
+          title="Tree-sitter (${ts_sha})"
           if [ -n "$lsp_ver" ]; then
             title="LSP ${lsp_ver} · ${title}"
           fi

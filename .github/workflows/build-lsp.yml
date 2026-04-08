@@ -96,14 +96,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LSP_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          # Read tree-sitter version if available
-          gh release download artifacts --repo "${{ github.repository }}" \
-            --pattern "ts-version.txt" --dir /tmp --clobber 2>/dev/null || true
-          ts_ver=$(cat /tmp/ts-version.txt 2>/dev/null || true)
+          # Preserve existing title prefix (Tree-sitter part) if present
+          current=$(gh release view artifacts --repo "${{ github.repository }}" --json name --jq '.name')
+          ts_part=$(echo "$current" | sed -n 's/.*\(Tree-sitter.*\)/\1/p')
 
           title="LSP ${LSP_VERSION}"
-          if [ -n "$ts_ver" ]; then
-            title="${title} · Tree-sitter ${ts_ver}"
+          if [ -n "$ts_part" ]; then
+            title="${title} · ${ts_part}"
           fi
 
           gh release edit artifacts --repo "${{ github.repository }}" --title "$title"

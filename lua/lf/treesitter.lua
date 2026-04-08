@@ -142,9 +142,8 @@ local function find_source_path()
   local plugin_dir = vim.fn.fnamemodify(plugin_path, ":h:h:h:h")
 
   local possible_paths = {
+    plugin_dir .. "/tree-sitter-lf",  -- bundled in lf.nvim
     vim.fn.fnamemodify(plugin_dir, ":h") .. "/tree-sitter-lf",
-    plugin_dir .. "/tree-sitter-lf",
-    vim.fn.expand("~/Workspace/lf.nvim/tree-sitter-lf"),
     vim.fn.getenv("LF_TREESITTER_PATH"),
   }
 
