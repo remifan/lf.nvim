@@ -234,7 +234,7 @@
     },
     "path": {
       "type": "PATTERN",
-      "value": "[a-zA-Z_][a-zA-Z0-9_.\\/-]*"
+      "value": "[a-zA-Z_.\\~\\/][a-zA-Z0-9_.\\/:~\\/-]*"
     },
     "preamble": {
       "type": "SEQ",
@@ -1714,11 +1714,29 @@
       "type": "PREC_RIGHT",
       "value": 0,
       "content": {
-        "type": "REPEAT1",
-        "content": {
-          "type": "SYMBOL",
-          "name": "var_ref"
-        }
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "var_ref"
+          },
+          {
+            "type": "REPEAT",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": ","
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "var_ref"
+                }
+              ]
+            }
+          }
+        ]
       }
     },
     "effect_list": {
@@ -3480,117 +3498,8 @@
       ]
     },
     "time_unit": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "nsec"
-        },
-        {
-          "type": "STRING",
-          "value": "nsecs"
-        },
-        {
-          "type": "STRING",
-          "value": "usec"
-        },
-        {
-          "type": "STRING",
-          "value": "usecs"
-        },
-        {
-          "type": "STRING",
-          "value": "msec"
-        },
-        {
-          "type": "STRING",
-          "value": "msecs"
-        },
-        {
-          "type": "STRING",
-          "value": "sec"
-        },
-        {
-          "type": "STRING",
-          "value": "secs"
-        },
-        {
-          "type": "STRING",
-          "value": "second"
-        },
-        {
-          "type": "STRING",
-          "value": "seconds"
-        },
-        {
-          "type": "STRING",
-          "value": "min"
-        },
-        {
-          "type": "STRING",
-          "value": "mins"
-        },
-        {
-          "type": "STRING",
-          "value": "minute"
-        },
-        {
-          "type": "STRING",
-          "value": "minutes"
-        },
-        {
-          "type": "STRING",
-          "value": "hour"
-        },
-        {
-          "type": "STRING",
-          "value": "hours"
-        },
-        {
-          "type": "STRING",
-          "value": "day"
-        },
-        {
-          "type": "STRING",
-          "value": "days"
-        },
-        {
-          "type": "STRING",
-          "value": "week"
-        },
-        {
-          "type": "STRING",
-          "value": "weeks"
-        },
-        {
-          "type": "STRING",
-          "value": "ns"
-        },
-        {
-          "type": "STRING",
-          "value": "us"
-        },
-        {
-          "type": "STRING",
-          "value": "ms"
-        },
-        {
-          "type": "STRING",
-          "value": "s"
-        },
-        {
-          "type": "STRING",
-          "value": "m"
-        },
-        {
-          "type": "STRING",
-          "value": "h"
-        },
-        {
-          "type": "STRING",
-          "value": "d"
-        }
-      ]
+      "type": "SYMBOL",
+      "name": "identifier"
     },
     "host": {
       "type": "CHOICE",
@@ -4034,6 +3943,10 @@
       "ipv4_host",
       "named_host",
       "hostname"
+    ],
+    [
+      "time",
+      "number"
     ]
   ],
   "precedences": [],

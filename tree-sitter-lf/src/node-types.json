@@ -1653,7 +1653,17 @@
   {
     "type": "time_unit",
     "named": true,
-    "fields": {}
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "timer",
@@ -2187,18 +2197,6 @@
     "named": false
   },
   {
-    "type": "d",
-    "named": false
-  },
-  {
-    "type": "day",
-    "named": false
-  },
-  {
-    "type": "days",
-    "named": false
-  },
-  {
     "type": "deadline",
     "named": false
   },
@@ -2231,19 +2229,7 @@
     "named": false
   },
   {
-    "type": "h",
-    "named": false
-  },
-  {
     "type": "history",
-    "named": false
-  },
-  {
-    "type": "hour",
-    "named": false
-  },
-  {
-    "type": "hours",
     "named": false
   },
   {
@@ -2287,10 +2273,6 @@
     "named": false
   },
   {
-    "type": "m",
-    "named": false
-  },
-  {
     "type": "main",
     "named": false
   },
@@ -2299,35 +2281,7 @@
     "named": false
   },
   {
-    "type": "min",
-    "named": false
-  },
-  {
-    "type": "mins",
-    "named": false
-  },
-  {
-    "type": "minute",
-    "named": false
-  },
-  {
-    "type": "minutes",
-    "named": false
-  },
-  {
     "type": "mode",
-    "named": false
-  },
-  {
-    "type": "ms",
-    "named": false
-  },
-  {
-    "type": "msec",
-    "named": false
-  },
-  {
-    "type": "msecs",
     "named": false
   },
   {
@@ -2344,18 +2298,6 @@
   },
   {
     "type": "new",
-    "named": false
-  },
-  {
-    "type": "ns",
-    "named": false
-  },
-  {
-    "type": "nsec",
-    "named": false
-  },
-  {
-    "type": "nsecs",
     "named": false
   },
   {
@@ -2399,26 +2341,6 @@
     "named": false
   },
   {
-    "type": "s",
-    "named": false
-  },
-  {
-    "type": "sec",
-    "named": false
-  },
-  {
-    "type": "second",
-    "named": false
-  },
-  {
-    "type": "seconds",
-    "named": false
-  },
-  {
-    "type": "secs",
-    "named": false
-  },
-  {
     "type": "serializer",
     "named": false
   },
@@ -2459,27 +2381,7 @@
     "named": false
   },
   {
-    "type": "us",
-    "named": false
-  },
-  {
-    "type": "usec",
-    "named": false
-  },
-  {
-    "type": "usecs",
-    "named": false
-  },
-  {
     "type": "watchdog",
-    "named": false
-  },
-  {
-    "type": "week",
-    "named": false
-  },
-  {
-    "type": "weeks",
     "named": false
   },
   {

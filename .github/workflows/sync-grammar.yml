@@ -95,24 +95,25 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: |
           cd tree-sitter-lf
-          total=0; errors=0; failed=""
-          for f in $(find /tmp/lingua-franca/test -name "*.lf"); do
-            total=$((total + 1))
-            if tree-sitter parse "$f" 2>&1 | grep -q "ERROR"; then
-              errors=$((errors + 1))
-              failed="$failed  $(echo $f | sed 's|/tmp/lingua-franca/||')\n"
-            fi
-          done
+          total=$(find /tmp/lingua-franca/test -name "*.lf" | wc -l)
+          errors=$(find /tmp/lingua-franca/test -name "*.lf" \
+            | xargs tree-sitter parse --quiet 2>&1 \
+            | grep -c "ERROR" || true)
 
           echo "Validation against LF ${{ steps.resolve.outputs.version }}: $errors failures out of $total files"
-          if [ $errors -gt 0 ]; then
-            echo -e "Failed:\n$failed"
+
+          # Show failed files if any
+          if [ "$errors" -gt 0 ]; then
+            echo "Failed:"
+            find /tmp/lingua-franca/test -name "*.lf" \
+              | xargs tree-sitter parse --quiet 2>&1 \
+              | grep "ERROR" \
+              | sed 's|/tmp/lingua-franca/||'
           fi
 
-          # Fail if more than 2% of files have errors
-          max_errors=$((total * 2 / 100 + 1))
-          if [ $errors -gt $max_errors ]; then
-            echo "Error rate exceeds 2% threshold, aborting."
+          # All upstream tests must pass
+          if [ "$errors" -gt 0 ]; then
+            echo "Parse errors detected, aborting."
             exit 1
           fi
 

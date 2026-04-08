@@ -173,7 +173,9 @@
 ; Time units
 ; ============================================================================
 
-(time_unit) @keyword
+((time_unit
+  (identifier) @keyword)
+  (#match? @keyword "^(nsecs?|usecs?|msecs?|secs?|seconds?|mins?|minutes?|hours?|days?|weeks?|ns|us|ms|[smhd])$"))
 
 ; ============================================================================
 ; Literals

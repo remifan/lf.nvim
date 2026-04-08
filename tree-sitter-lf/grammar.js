@@ -25,6 +25,7 @@ module.exports = grammar({
   inline: ($) => [$.reactor_member],
   conflicts: ($) => [
     [$.ipv4_host, $.named_host, $.hostname],
+    [$.time, $.number],
   ],
 
   rules: {
@@ -67,7 +68,7 @@ module.exports = grammar({
 
     import_path: ($) => seq('<', $.path, '>'),
 
-    path: ($) => /[a-zA-Z_][a-zA-Z0-9_.\/-]*/,
+    path: ($) => /[a-zA-Z_.\~\/][a-zA-Z0-9_.\/:~\/-]*/,
 
     preamble: ($) =>
       seq(
@@ -268,7 +269,7 @@ module.exports = grammar({
 
     trigger_list: ($) => seq('(', commaSep($.trigger_ref), ')'),
 
-    source_list: ($) => prec.right(repeat1($.var_ref)),
+    source_list: ($) => prec.right(commaSep1($.var_ref)),
 
     effect_list: ($) => seq('->', commaSep1($.var_ref_or_mode_transition)),
 
@@ -605,16 +606,7 @@ module.exports = grammar({
         'never'
       ),
 
-    time_unit: ($) =>
-      choice(
-        'nsec', 'nsecs', 'usec', 'usecs', 'msec', 'msecs',
-        'sec', 'secs', 'second', 'seconds',
-        'min', 'mins', 'minute', 'minutes',
-        'hour', 'hours',
-        'day', 'days',
-        'week', 'weeks',
-        'ns', 'us', 'ms', 's', 'm', 'h', 'd'
-      ),
+    time_unit: ($) => $.identifier,
 
     host: ($) =>
       choice(

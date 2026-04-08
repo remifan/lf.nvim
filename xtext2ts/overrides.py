@@ -52,17 +52,8 @@ REPLACE_RULES = {
     "target_language": """($) =>
       choice('C', 'CCpp', 'Cpp', 'Python', 'TypeScript', 'Rust')""",
 
-    # ── time_unit (Xtext just uses ID, validated later) ──────────
-    "time_unit": """($) =>
-      choice(
-        'nsec', 'nsecs', 'usec', 'usecs', 'msec', 'msecs',
-        'sec', 'secs', 'second', 'seconds',
-        'min', 'mins', 'minute', 'minutes',
-        'hour', 'hours',
-        'day', 'days',
-        'week', 'weeks',
-        'ns', 'us', 'ms', 's', 'm', 'h', 'd'
-      )""",
+    # ── time_unit (Xtext: TimeUnit: ID — any identifier, validated later) ──
+    "time_unit": """($) => $.identifier""",
 
     # ── Regex-based terminals ────────────────────────────────────
     "identifier": """($) => /[a-zA-Z_][a-zA-Z0-9_]*/""",
@@ -75,7 +66,7 @@ REPLACE_RULES = {
       )""",
     "boolean": """($) => choice('true', 'false', 'True', 'False')""",
     "code_block": """($) => seq('{=', optional($._code_body), '=}')""",
-    "path": """($) => /[a-zA-Z_][a-zA-Z0-9_.\\/-]*/""",
+    "path": """($) => /[a-zA-Z_.\\~\\/][a-zA-Z0-9_.\\/:~\\/-]*/""",
     "ipv4_addr": """($) => /\\d+\\.\\d+\\.\\d+\\.\\d+/""",
     "ipv6_addr": """($) => /[0-9a-fA-F:]+/""",
 
@@ -340,7 +331,7 @@ REPLACE_RULES = {
     "trigger_ref": """($) => choice($.builtin_trigger, $.var_ref)""",
 
     # source_list: needs prec.right to avoid ambiguity with effect_list
-    "source_list": """($) => prec.right(repeat1($.var_ref))""",
+    "source_list": """($) => prec.right(commaSep1($.var_ref))""",
 
     # braced_list_expression: negative prec to avoid conflict with reactor_body
     "braced_list_expression": """($) => prec(-1, seq('{', commaSep($.expression), '}'))""",
@@ -424,7 +415,7 @@ GRAMMAR_META = {
     "extras": """($) => [/\\s/, $.line_comment, $.block_comment]""",
     "word": """($) => $.identifier""",
     "inline": """($) => [$.reactor_member]""",
-    "conflicts": """($) => [\n    [$.ipv4_host, $.named_host, $.hostname],\n  ]""",
+    "conflicts": """($) => [\n    [$.ipv4_host, $.named_host, $.hostname],\n    [$.time, $.number],\n  ]""",
 }
 
 # Precedence wrappers (tree-sitter rule name -> wrapper)
