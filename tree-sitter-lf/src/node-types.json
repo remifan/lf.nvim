@@ -2327,6 +2327,10 @@
     "named": false
   },
   {
+    "type": "msecs",
+    "named": false
+  },
+  {
     "type": "mutable",
     "named": false
   },
@@ -2348,6 +2352,10 @@
   },
   {
     "type": "nsec",
+    "named": false
+  },
+  {
+    "type": "nsecs",
     "named": false
   },
   {
@@ -2456,6 +2464,10 @@
   },
   {
     "type": "usec",
+    "named": false
+  },
+  {
+    "type": "usecs",
     "named": false
   },
   {

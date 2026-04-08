@@ -3488,11 +3488,23 @@
         },
         {
           "type": "STRING",
+          "value": "nsecs"
+        },
+        {
+          "type": "STRING",
           "value": "usec"
         },
         {
           "type": "STRING",
+          "value": "usecs"
+        },
+        {
+          "type": "STRING",
           "value": "msec"
+        },
+        {
+          "type": "STRING",
+          "value": "msecs"
         },
         {
           "type": "STRING",

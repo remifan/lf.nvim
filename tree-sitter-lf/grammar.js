@@ -607,7 +607,8 @@ module.exports = grammar({
 
     time_unit: ($) =>
       choice(
-        'nsec', 'usec', 'msec', 'sec', 'secs', 'second', 'seconds',
+        'nsec', 'nsecs', 'usec', 'usecs', 'msec', 'msecs',
+        'sec', 'secs', 'second', 'seconds',
         'min', 'mins', 'minute', 'minutes',
         'hour', 'hours',
         'day', 'days',

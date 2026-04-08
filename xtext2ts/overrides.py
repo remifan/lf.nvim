@@ -55,7 +55,8 @@ REPLACE_RULES = {
     # ── time_unit (Xtext just uses ID, validated later) ──────────
     "time_unit": """($) =>
       choice(
-        'nsec', 'usec', 'msec', 'sec', 'secs', 'second', 'seconds',
+        'nsec', 'nsecs', 'usec', 'usecs', 'msec', 'msecs',
+        'sec', 'secs', 'second', 'seconds',
         'min', 'mins', 'minute', 'minutes',
         'hour', 'hours',
         'day', 'days',
