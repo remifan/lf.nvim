@@ -90,3 +90,20 @@ jobs:
         run: |
           gh release upload artifacts "${{ needs.check.outputs.jar_name }}" \
             --repo "${{ github.repository }}" --clobber
+
+      - name: Update release title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LSP_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # Read tree-sitter version if available
+          gh release download artifacts --repo "${{ github.repository }}" \
+            --pattern "ts-version.txt" --dir /tmp --clobber 2>/dev/null || true
+          ts_ver=$(cat /tmp/ts-version.txt 2>/dev/null || true)
+
+          title="LSP ${LSP_VERSION}"
+          if [ -n "$ts_ver" ]; then
+            title="${title} · Tree-sitter ${ts_ver}"
+          fi
+
+          gh release edit artifacts --repo "${{ github.repository }}" --title "$title"

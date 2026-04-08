@@ -142,3 +142,20 @@ jobs:
           gh release upload artifacts \
             artifacts/* queries.zip ts-version.txt \
             --repo "${{ github.repository }}" --clobber
+
+      - name: Update release title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TS_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # Read LSP version from existing jar asset name
+          lsp_ver=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
+            --jq '[.assets[].name | select(startswith("lsp-"))][0] // ""' \
+            | sed -n 's/^lsp-\(.*\)-all\.jar$/v\1/p')
+
+          title="Tree-sitter ${TS_VERSION}"
+          if [ -n "$lsp_ver" ]; then
+            title="LSP ${lsp_ver} · ${title}"
+          fi
+
+          gh release edit artifacts --repo "${{ github.repository }}" --title "$title"
