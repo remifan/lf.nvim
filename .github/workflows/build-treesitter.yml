@@ -51,10 +51,12 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: lf-linux-x64.so
-          - os: macos-13
+          - os: macos-latest
             artifact: lf-darwin-x64.so
+            cflags: -target x86_64-apple-macos11
           - os: macos-latest
             artifact: lf-darwin-arm64.so
+            cflags: ""
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tree-sitter-lf
@@ -66,7 +68,7 @@ jobs:
       - name: Compile parser
         run: |
           cc -shared -o "${{ matrix.artifact }}" -fPIC -O2 \
-            -I./src src/parser.c src/scanner.c
+            ${{ matrix.cflags }} -I./src src/parser.c src/scanner.c
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
