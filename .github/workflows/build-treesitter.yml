@@ -74,7 +74,14 @@ jobs:
           gh release view artifacts --repo "${{ github.repository }}" > /dev/null 2>&1 || \
           gh release create artifacts --repo "${{ github.repository }}" \
             --title "Pre-built artifacts" \
-            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim."
+            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
+          These artifacts are built and published automatically by GitHub Actions.
+
+          Install in Neovim:
+          \`\`\`vim
+          :LFLspInstall
+          :LFTSInstall
+          \`\`\`"
 
       - name: Upload to artifacts release
         env:
@@ -84,10 +91,18 @@ jobs:
             artifacts/* queries.zip \
             --repo "${{ github.repository }}" --clobber
 
-      - name: Update release title
+      - name: Update release title and notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           lf_ver=$(cat .lf-upstream-version 2>/dev/null || echo "unknown")
           gh release edit artifacts --repo "${{ github.repository }}" \
-            --title "Artifacts for LF ${lf_ver}"
+            --title "Artifacts for LF ${lf_ver}" \
+            --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
+          These artifacts are built and published automatically by GitHub Actions.
+
+          Install in Neovim:
+          \`\`\`vim
+          :LFLspInstall
+          :LFTSInstall
+          \`\`\`"

@@ -77,6 +77,7 @@ jobs:
           gh release create artifacts --repo "${{ github.repository }}" \
             --title "Pre-built artifacts" \
             --notes "Pre-built LSP server and tree-sitter parser for lf.nvim.
+          These artifacts are built and published automatically by GitHub Actions.
 
           Install in Neovim:
           \`\`\`vim
