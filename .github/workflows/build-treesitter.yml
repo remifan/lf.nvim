@@ -51,6 +51,9 @@ jobs:
           - os: ubuntu-latest
             artifact: lf-linux-x64.so
             compile: cc -shared -o lf-linux-x64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
+          - os: ubuntu-24.04-arm
+            artifact: lf-linux-arm64.so
+            compile: cc -shared -o lf-linux-arm64.so -fPIC -O2 -I./src src/parser.c src/scanner.c
           - os: macos-latest
             artifact: lf-darwin-x64.so
             compile: cc -shared -o lf-darwin-x64.so -fPIC -O2 -target x86_64-apple-macos11 -I./src src/parser.c src/scanner.c
@@ -60,6 +63,10 @@ jobs:
           - os: windows-latest
             artifact: lf-win-x64.dll
             compile: gcc -shared -o lf-win-x64.dll -O2 -I./src src/parser.c src/scanner.c
+          - os: windows-latest
+            artifact: lf-win-arm64.dll
+            setup: choco install llvm --params "'/InstallAllUsers'" -y
+            compile: clang -shared -o lf-win-arm64.dll -O2 --target=aarch64-pc-windows-msvc -I./src src/parser.c src/scanner.c
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tree-sitter-lf
@@ -67,6 +74,10 @@ jobs:
         with:
           repository: remifan/tree-sitter-lf
           ref: ${{ needs.check.outputs.version }}
+
+      - name: Setup toolchain
+        if: matrix.setup
+        run: ${{ matrix.setup }}
 
       - name: Compile parser
         run: ${{ matrix.compile }}
