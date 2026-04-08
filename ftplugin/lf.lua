@@ -25,13 +25,7 @@ vim.bo.tabstop = 4
 vim.wo.number = true
 vim.wo.relativenumber = true
 
--- Set fold method to syntax when treesitter is not available
-if not pcall(require, "nvim-treesitter") then
-  vim.wo.foldmethod = "syntax"
-end
-
--- Buffer-local keybindings (will be overridden by plugin if loaded)
--- These serve as fallbacks if the plugin isn't loaded
+-- Buffer-local keybindings
 local keymap_opts = { noremap = true, silent = true, buffer = true }
 
 -- Quick build command

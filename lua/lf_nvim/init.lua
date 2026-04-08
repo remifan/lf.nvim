@@ -93,45 +93,4 @@ function M.show_info()
   print(string.format("  Use Tabs: %s", tostring(M.config.indent.use_tabs)))
 end
 
--- Update syntax from VSCode extension
-function M.update_syntax(opts)
-  opts = opts or {}
-  local dry_run = opts.dry_run or false
-  local show_keywords = opts.show_keywords or false
-
-  -- Get the script path
-  local script_path = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h") .. "/scripts/update_syntax.lua"
-
-  -- Build arguments
-  local args = {}
-  if dry_run then
-    table.insert(args, "--dry-run")
-  end
-  if show_keywords then
-    table.insert(args, "--show-keywords")
-  end
-
-  -- Run the update script
-  print("Running syntax update script...")
-  local cmd = "nvim -l " .. vim.fn.shellescape(script_path)
-  for _, arg in ipairs(args) do
-    cmd = cmd .. " " .. arg
-  end
-
-  local output = vim.fn.system(cmd)
-  print(output)
-
-  if vim.v.shell_error == 0 then
-    if not dry_run and not show_keywords then
-      -- Reload syntax for current buffer if it's an LF file
-      if vim.bo.filetype == "lf" then
-        vim.cmd("syntax sync fromstart")
-        print("Syntax reloaded for current buffer")
-      end
-    end
-  else
-    print("Error running update script. Exit code: " .. vim.v.shell_error)
-  end
-end
-
 return M

@@ -22,17 +22,5 @@ vim.api.nvim_create_user_command("LFDetectTarget", function()
   require("lf_nvim").detect_target_language()
 end, { desc = "Manually detect target language from current buffer" })
 
-vim.api.nvim_create_user_command("LFUpdateSyntax", function()
-  require("lf_nvim").update_syntax()
-end, { desc = "Update syntax from VSCode extension" })
-
-vim.api.nvim_create_user_command("LFUpdateSyntaxDryRun", function()
-  require("lf_nvim").update_syntax({ dry_run = true })
-end, { desc = "Preview available syntax updates" })
-
-vim.api.nvim_create_user_command("LFShowKeywords", function()
-  require("lf_nvim").update_syntax({ show_keywords = true })
-end, { desc = "Display all LF keywords from VSCode grammar" })
-
 -- The plugin will be set up by the user calling require("lf").setup()
 -- LSP commands are registered in lua/lf/commands.lua when LSP is enabled

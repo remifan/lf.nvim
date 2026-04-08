@@ -14,10 +14,6 @@ setlocal comments=://,:#,sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/
 " Set formatting options
 setlocal formatoptions-=t formatoptions+=croql
 
-" Enable folding on reactor/preamble blocks
-setlocal foldmethod=syntax
-setlocal foldlevel=99
-
 " Set indentation
 setlocal expandtab
 setlocal shiftwidth=4
@@ -25,4 +21,4 @@ setlocal softtabstop=4
 setlocal tabstop=4
 
 " Undo ftplugin settings
-let b:undo_ftplugin = "setlocal commentstring< comments< formatoptions< foldmethod< foldlevel< expandtab< shiftwidth< softtabstop< tabstop<"
+let b:undo_ftplugin = "setlocal commentstring< comments< formatoptions< expandtab< shiftwidth< softtabstop< tabstop<"
