@@ -22,3 +22,4 @@ html/*.log
 test.lf
 minimal-init.lua
 example-config.lua
+__pycache__/
