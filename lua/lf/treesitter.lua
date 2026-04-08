@@ -552,13 +552,13 @@ function M.install(opts)
       return
     end
 
-    vim.notify("[lf.nvim] GitHub download failed (" .. (err or "unknown") .. "), trying local source...", vim.log.levels.WARN)
+    local gh_err = err or "unknown"
 
     -- Fall back to local source
     local source_path = find_source_path()
     if not source_path then
       vim.notify(
-        "[lf.nvim] Could not download from GitHub and no local source found.\n\n" ..
+        "[lf.nvim] Could not download from GitHub (" .. gh_err .. ") and no local source found.\n\n" ..
         "Ensure you have internet access, or set the local source path:\n" ..
         "  require('lf.treesitter').setup({ source_path = '/path/to/tree-sitter-lf' })\n\n" ..
         "Or set the LF_TREESITTER_PATH environment variable.",
@@ -567,7 +567,7 @@ function M.install(opts)
       return
     end
 
-    vim.notify("[lf.nvim] Installing from local source: " .. source_path, vim.log.levels.INFO)
+    vim.notify("[lf.nvim] GitHub download failed (" .. gh_err .. "), falling back to local source: " .. source_path, vim.log.levels.WARN)
 
     install_from_local(source_path, opts, function(lok, lerr)
       if lok then
