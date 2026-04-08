@@ -96,13 +96,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LSP_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          # Preserve existing title prefix (Tree-sitter part) if present
-          current=$(gh release view artifacts --repo "${{ github.repository }}" --json name --jq '.name')
-          ts_part=$(echo "$current" | sed -n 's/.*\(Tree-sitter.*\)/\1/p')
+          # Read the LF upstream version from the repo
+          lf_ver=$(gh api repos/${{ github.repository }}/contents/.lf-upstream-version \
+            --jq '.content' 2>/dev/null | base64 -d | tr -d '\n' || echo "unknown")
 
-          title="LSP ${LSP_VERSION}"
-          if [ -n "$ts_part" ]; then
-            title="${title} · ${ts_part}"
-          fi
+          title="Artifacts for LF ${lf_ver} · LSP ${LSP_VERSION}"
 
           gh release edit artifacts --repo "${{ github.repository }}" --title "$title"

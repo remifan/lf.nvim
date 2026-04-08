@@ -53,6 +53,7 @@ jobs:
             echo "Grammar changed ($old_hash -> $new_hash)."
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "$new_hash" > .xtext-grammar-sha256
+            echo "${{ steps.resolve.outputs.version }}" > .lf-upstream-version
           fi
 
       - name: Set up Python

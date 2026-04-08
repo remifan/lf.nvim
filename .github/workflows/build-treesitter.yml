@@ -88,15 +88,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ts_sha=$(git log -1 --format=%h -- tree-sitter-lf/)
+          lf_ver=$(cat .lf-upstream-version 2>/dev/null || echo "unknown")
 
           lsp_ver=$(gh release view artifacts --repo "${{ github.repository }}" --json assets \
             --jq '[.assets[].name | select(startswith("lsp-"))][0] // ""' \
             | sed -n 's/^lsp-\(.*\)-all\.jar$/v\1/p')
 
-          title="Tree-sitter (${ts_sha})"
+          title="Artifacts for LF ${lf_ver}"
           if [ -n "$lsp_ver" ]; then
-            title="LSP ${lsp_ver} · ${title}"
+            title="${title} · LSP ${lsp_ver}"
           fi
 
           gh release edit artifacts --repo "${{ github.repository }}" --title "$title"
