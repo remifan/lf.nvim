@@ -7,13 +7,12 @@ Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with s
 ## ✨ Features
 
 ### 🎨 Syntax Highlighting (Always Available)
-- **Tree-sitter support** - Modern, accurate syntax highlighting with `:LFTSInstall`
-- **Incremental selection** - Expand/shrink selection by AST nodes (works with nvim-treesitter)
-- **Textobjects** - Select functions, classes, parameters with treesitter-textobjects
+- **Tree-sitter powered** - Accurate highlighting from a grammar auto-generated from upstream Xtext
+- **Zero-config install** - Parser and queries are downloaded automatically on first open of a `.lf` file (requires `curl`)
 - **Embedded language support** - Proper highlighting for C/C++, Python, TypeScript, and Rust code blocks
 - **Automatic target detection** - Detects target language from `target` declarations
-- **Fallback regex syntax** - Works without treesitter for basic highlighting
-- **Cross-platform** - Works on Mac, Linux, and Windows
+- **Textobjects ready** - Ships `textobjects.scm` queries for use with [nvim-treesitter-textobjects](https://github.com/nvim-treesitter/nvim-treesitter-textobjects)
+- **Cross-platform** - Pre-built parsers for Linux, macOS, and Windows (x64 + ARM64)
 
 ### 🚀 LSP Features (Mac/Linux Only)
 > **Note**: LSP features require Mac or Linux as Lingua Franca doesn't support Windows
@@ -30,16 +29,13 @@ Comprehensive Neovim plugin for [Lingua Franca](https://www.lf-lang.org/) with s
 
 ### Minimal (Syntax Only)
 
-For users who only want syntax highlighting:
+For users who only want syntax highlighting. No dependencies required — the parser and queries are downloaded automatically on first open of a `.lf` file (requires `curl`):
 
 ```lua
 -- lazy.nvim
 {
   "remifan/lf.nvim",
   ft = "lf",
-  dependencies = {
-    "nvim-treesitter/nvim-treesitter",  -- Optional: for incremental selection and textobjects
-  },
   config = function()
     require("lf").setup({
       enable_lsp = false,  -- Disable LSP features
@@ -62,7 +58,6 @@ For the complete experience with LSP, diagrams, and all features (Mac/Linux):
   "remifan/lf.nvim",
   ft = "lf",
   dependencies = {
-    "nvim-treesitter/nvim-treesitter",  -- Optional: for incremental selection and textobjects
     "nvim-telescope/telescope.nvim",    -- Optional: enhanced library browser
   },
   -- Note: Diagram dependencies build automatically on first use
@@ -127,10 +122,7 @@ The tree-sitter parser is **automatically installed** the first time you open a 
 
 Pre-built parser binaries are downloaded from GitHub for Linux, macOS, and Windows (x64 and ARM64). Falls back to local compilation if the download fails.
 
-**Incremental Selection** (with nvim-treesitter configured):
-- Press `<CR>` in normal mode to start selection
-- Press `<CR>` again to expand to next AST node
-- Press `<BS>` to shrink selection
+**Textobjects**: The parser ships `textobjects.scm` queries at `tree-sitter-lf/queries/textobjects.scm`, usable with [nvim-treesitter-textobjects](https://github.com/nvim-treesitter/nvim-treesitter-textobjects) (`@function.*`, `@class.*`, `@parameter.*`, `@block.*`, `@assignment.*`, etc.).
 
 ## 🛠️ LSP Setup (Optional)
 
