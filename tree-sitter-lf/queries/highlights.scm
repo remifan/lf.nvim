@@ -50,7 +50,7 @@
 "after" @keyword
 "deadline" @keyword
 "at" @keyword
-"widthof" @keyword.function
+"widthof(" @keyword.function
 "interleaved" @keyword
 "STP" @keyword
 "STAA" @keyword
@@ -147,9 +147,9 @@
 ; ============================================================================
 
 (imported_reactor
-  class: (identifier) @type)
+  reactor_class: (identifier) @type)
 (imported_reactor
-  alias: (identifier) @type)
+  name: (identifier) @type)
 
 ; ============================================================================
 ; Attributes
@@ -165,9 +165,9 @@
 ; ============================================================================
 
 (key_value_pair
-  key: (kebab) @property)
+  name: (kebab) @property)
 (key_value_pair
-  key: (string) @property)
+  name: (string) @property)
 
 ; ============================================================================
 ; Time units

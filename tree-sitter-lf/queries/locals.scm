@@ -113,7 +113,7 @@
 
 ; Import alias
 (imported_reactor
-  alias: (identifier) @local.definition.type)
+  name: (identifier) @local.definition.type)
 
 ; ============================================================================
 ; References - References to defined variables

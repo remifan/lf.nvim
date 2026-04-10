@@ -18,11 +18,11 @@
 
 ; Method as function
 (method
-  body: (code_block) @function.inner) @function.outer
+  code: (code_block) @function.inner) @function.outer
 
 ; Deadline handler
 (deadline
-  handler: (code_block) @function.inner) @function.outer
+  code: (code_block) @function.inner) @function.outer
 
 ; Watchdog handler
 (watchdog

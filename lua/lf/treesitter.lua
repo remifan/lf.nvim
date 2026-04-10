@@ -93,8 +93,9 @@ local function get_parser_install_dir()
     end
   end
 
-  -- Fall back to user data directory (always writable)
-  local data_parser = vim.fn.stdpath("data") .. "/parser"
+  -- Fall back to user data directory (always writable; must be under site/
+  -- so that it's picked up via runtimepath)
+  local data_parser = vim.fn.stdpath("data") .. "/site/parser"
   vim.fn.mkdir(data_parser, "p")
   return data_parser
 end
@@ -514,10 +515,11 @@ function M.uninstall()
     removed = true
   end
 
-  -- Also clean up any stale queries in site directory (legacy location)
-  local site_queries = vim.fn.stdpath("data") .. "/site/queries/lf"
-  if vim.fn.isdirectory(site_queries) == 1 then
-    vim.fn.delete(site_queries, "rf")
+  -- Also clean up a stale parser in the legacy location (stdpath("data")/parser
+  -- is not in runtimepath, so parsers installed there were never loaded).
+  local legacy_parser = vim.fn.stdpath("data") .. "/parser/" .. parser_lib_name()
+  if vim.fn.filereadable(legacy_parser) == 1 then
+    vim.fn.delete(legacy_parser)
     removed = true
   end
 
