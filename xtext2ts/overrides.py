@@ -48,10 +48,6 @@ REPLACE_RULES = {
         repeat1($.reactor)
       )""",
 
-    # ── target_language (not in Xtext - target name is just ID) ──
-    "target_language": """($) =>
-      choice('C', 'CCpp', 'Cpp', 'Python', 'TypeScript', 'Rust')""",
-
     # ── time_unit (Xtext: TimeUnit: ID — any identifier, validated later) ──
     "time_unit": """($) => $.identifier""",
 
@@ -72,11 +68,14 @@ REPLACE_RULES = {
 
     # ── Rules needing tree-sitter-specific structure ──────────────
 
-    # target_declaration: Xtext uses 'target' name=ID, but we want target_language
+    # target_declaration: Xtext uses 'target' name=ID (any identifier, validated
+    # later by lfc). Alias the identifier so the CST exposes a target_language
+    # leaf without duplicating the identifier token (tree-sitter merges
+    # identical tokens, which would break the word: declaration).
     "target_declaration": """($) =>
       seq(
         'target',
-        field('name', $.target_language),
+        field('name', alias($.identifier, $.target_language)),
         optional(field('config', $.key_value_pairs)),
         optional(';')
       )""",
@@ -347,7 +346,7 @@ EXTRA_RULES = {
     "triple_double_quoted_string": '''($) => /"""[\\s\\S]*?"""/''',
     "char_literal": '''($) => /'[^'\\\\](?:\\\\.[^'\\\\])*'/''',
     "import_path": """($) => seq('<', $.path, '>')""",
-    "target_language": None,  # Already in REPLACE_RULES
+    "target_language": None,  # Emitted as an alias of identifier in target_declaration
     "timer_spec": """($) =>
       seq(
         '(',
