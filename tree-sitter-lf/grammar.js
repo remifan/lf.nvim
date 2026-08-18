@@ -40,13 +40,10 @@ module.exports = grammar({
     target_declaration: ($) =>
       seq(
         'target',
-        field('name', $.target_language),
+        field('name', alias($.identifier, $.target_language)),
         optional(field('config', $.key_value_pairs)),
         optional(';')
       ),
-
-    target_language: ($) =>
-      choice('C', 'CCpp', 'Cpp', 'Python', 'TypeScript', 'Rust'),
 
     import_statement: ($) =>
       seq(
@@ -434,7 +431,8 @@ module.exports = grammar({
       )),
 
     attribute_parameter: ($) =>
-      seq(
+      choice(
+        seq(
         optional(seq(
         field('name', $.identifier),
         '='
@@ -443,6 +441,8 @@ module.exports = grammar({
         field('value', $.literal),
         field('time', $.time)
       )
+      ),
+        field('name', $.identifier)
       ),
 
     key_value_pairs: ($) =>
@@ -700,6 +700,36 @@ module.exports = grammar({
       token(seq('/*', /[^*]*\*+([^/*][^*]*\*+)*/, '/')),
 
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
+
+    package_fs_name: ($) =>
+      repeat1(choice(
+        $.identifier,
+        $.integer,
+        $.integer,
+        '.',
+        '_',
+        '-'
+      )),
+
+    package_path: ($) =>
+      seq(
+        optional(seq(
+        $.package_fs_name,
+        ':\\\\'
+      )),
+        optional(choice(
+        '\\\\',
+        '/'
+      )),
+        $.package_fs_name,
+        repeat(seq(
+        choice(
+        '\\\\',
+        '/'
+      ),
+        $.package_fs_name
+      ))
+      ),
 
     ipv6_seg: ($) => /[0-9a-fA-F]+/,
 

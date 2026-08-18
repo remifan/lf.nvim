@@ -1448,6 +1448,7 @@
   {
     "type": "source_file",
     "named": true,
+    "root": true,
     "fields": {},
     "children": {
       "multiple": true,
@@ -1618,11 +1619,6 @@
         ]
       }
     }
-  },
-  {
-    "type": "target_language",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "time",
@@ -2121,27 +2117,7 @@
     "named": false
   },
   {
-    "type": "C",
-    "named": false
-  },
-  {
-    "type": "CCpp",
-    "named": false
-  },
-  {
-    "type": "Cpp",
-    "named": false
-  },
-  {
     "type": "False",
-    "named": false
-  },
-  {
-    "type": "Python",
-    "named": false
-  },
-  {
-    "type": "Rust",
     "named": false
   },
   {
@@ -2154,10 +2130,6 @@
   },
   {
     "type": "True",
-    "named": false
-  },
-  {
-    "type": "TypeScript",
     "named": false
   },
   {
@@ -2186,7 +2158,8 @@
   },
   {
     "type": "block_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "char_literal",
@@ -2266,7 +2239,8 @@
   },
   {
     "type": "line_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "logical",
@@ -2363,6 +2337,10 @@
   {
     "type": "target",
     "named": false
+  },
+  {
+    "type": "target_language",
+    "named": true
   },
   {
     "type": "time",
