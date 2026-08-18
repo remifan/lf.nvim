@@ -83,14 +83,15 @@ jobs:
         if: steps.check.outputs.changed == 'true'
         run: cd tree-sitter-lf && tree-sitter generate
 
+      # actions/checkout rejects paths outside the workspace, and checking out
+      # inside it would get committed by create-pull-request, so clone to /tmp.
       - name: Checkout upstream test files at anchored version
         if: steps.check.outputs.changed == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: lf-lang/lingua-franca
-          ref: ${{ steps.resolve.outputs.version }}
-          sparse-checkout: test
-          path: /tmp/lingua-franca
+        run: |
+          git clone --depth 1 --branch "${{ steps.resolve.outputs.version }}" \
+            --filter=blob:none --sparse \
+            https://github.com/lf-lang/lingua-franca.git /tmp/lingua-franca
+          git -C /tmp/lingua-franca sparse-checkout set test
 
       - name: Validate against upstream test files
         if: steps.check.outputs.changed == 'true'
